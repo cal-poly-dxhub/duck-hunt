@@ -5,5 +5,5 @@ assets/*
 temp-*
 alembic.ini
 alembic/versions/*
-games/*
+games/
 alembic/
