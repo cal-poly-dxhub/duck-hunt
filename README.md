@@ -29,14 +29,15 @@ createdb duck_hunt
 4. create and activate virtual environment
 
 ```bash
-cd fastapi
 python3.9 -m venv .venv
 source .venv/bin/activate
+pip install -r fastapi/requirements.txt
 ```
 
 5. create environment file
 
 ```bash
+cd fastapi
 cp .env.example .env
 ```
 
@@ -57,8 +58,7 @@ pip install -r requirements.txt
 7. setup alembic
 
 ```bash
-# Make sure you're in the fastapi directory
-cd fastapi
+alembic init alembic
 alembic revision --autogenerate -m "initial migration"
 alembic upgrade head
 cd ..

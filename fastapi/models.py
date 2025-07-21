@@ -116,10 +116,32 @@ class Team(Base, TimestampsMixin):
         return f"Team {self.name} (ID: {self.id})"
 
 
+class User(Base, TimestampsMixin):
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # relationships
+    team = relationship("Team", back_populates="user")
+
+    # repr str
+    def __repr__(self):
+        return f"<User(id={self.id})>"
+
+    def __str__(self):
+        return f"User (ID: {self.id})"
+
+
 class Message(Base, TimestampsMixin):
     __tablename__ = "messages"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
     team_id = Column(
         UUID(as_uuid=True),
         ForeignKey("teams.id", ondelete="CASCADE"),
@@ -142,13 +164,14 @@ class Message(Base, TimestampsMixin):
     text = Column(String, nullable=False)
 
     # relationships
+    user = relationship("User", back_populates="messages")
     team = relationship("Team", back_populates="messages")
     game = relationship("Game", back_populates="messages")
     level = relationship("Level", back_populates="messages")
 
     # repr str
     def __repr__(self):
-        return f"<Message(id={self.id}, team_id={self.team_id}, game_id={self.game_id}, level_id={self.level_id}, role={self.role})>"
+        return f"<Message(id={self.id}, user_id={self.user_id}, team_id={self.team_id}, game_id={self.game_id}, level_id={self.level_id}, role={self.role})>"
 
     def __str__(self):
-        return f"Message {self.id} (Team: {self.team_id}, Game: {self.game_id}, Level: {self.level_id}, Role: {self.role})"
+        return f"Message {self.id} (User: {self.user_id}, Team: {self.team_id}, Game: {self.game_id}, Level: {self.level_id}, Role: {self.role})"
