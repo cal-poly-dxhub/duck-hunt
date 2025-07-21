@@ -2,7 +2,7 @@
 
 ## you may ask: why a monolith?
 
-- because it doesnt need to be scalable this is like 50 ppl max ata
+- because it doesnt need to be scalable this is like 150 ppl max atm
 
 ## setup python
 
