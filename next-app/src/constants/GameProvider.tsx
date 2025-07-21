@@ -9,8 +9,11 @@ import {
 } from "react";
 
 interface GameContextType {
+  userId?: string;
   teamId?: string;
+  setUserId: (id: string) => void;
   setTeamId: (id: string) => void;
+  clearUserId: () => void;
   clearTeamId: () => void;
   isLoading: boolean;
 }
@@ -18,13 +21,25 @@ interface GameContextType {
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
 const GameProvider = ({ children }: { children: ReactNode }) => {
+  const [userId, setUserId] = useState<string | undefined>(undefined);
   const [teamId, setTeamId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+
+  const handleSetUserId = (id: string) => {
+    console.log("INFO: GameProvider - setting userId:", id);
+    setUserId(id);
+    localStorage.setItem("userId", id);
+  };
 
   const handleSetTeamId = (id: string) => {
     console.log("INFO: GameProvider - setting teamId:", id);
     setTeamId(id);
     localStorage.setItem("teamId", id);
+  };
+
+  const handleClearUserId = () => {
+    setUserId(undefined);
+    localStorage.removeItem("userId");
   };
 
   const handleClearTeamId = () => {
@@ -45,8 +60,11 @@ const GameProvider = ({ children }: { children: ReactNode }) => {
   return (
     <GameContext.Provider
       value={{
+        userId,
         teamId,
+        setUserId: handleSetUserId,
         setTeamId: handleSetTeamId,
+        clearUserId: handleClearUserId,
         clearTeamId: handleClearTeamId,
         isLoading,
       }}

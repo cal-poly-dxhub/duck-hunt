@@ -39,7 +39,13 @@ export default function Chat() {
     {}
   );
 
-  const { teamId, setTeamId, isLoading: gameLoading } = useGame();
+  const {
+    userId,
+    teamId,
+    setUserId,
+    setTeamId,
+    isLoading: gameLoading,
+  } = useGame();
 
   const typeMessage = async (messageId: number, fullText: string) => {
     for (let i = 0; i <= fullText.length; i++) {
@@ -125,8 +131,19 @@ export default function Chat() {
   const levelIdFromUrl = searchParams.get("level-id");
   const endSequenceFromUrl = searchParams.get("end-sequence");
 
+  /**
+   * setup
+   */
   useEffect(() => {
-    if (gameLoading) return;
+    if (gameLoading) {
+      return;
+    }
+
+    if (!userId) {
+      const newUserId = crypto.randomUUID();
+      console.warn("No userId found in GameProvider. Generating a new one.");
+      setUserId(newUserId);
+    }
 
     if (teamIdFromUrl) {
       console.warn(
@@ -144,35 +161,33 @@ export default function Chat() {
       setMessages([message]);
       typeMessage(message.id, message.text);
     }
-  }, [teamIdFromUrl, teamId, setTeamId, gameLoading]);
+  }, [teamIdFromUrl, teamId, setTeamId, gameLoading, userId, setUserId]);
 
-  useEffect(() => {
-    if (gameLoading) return;
-    if (teamIdFromUrl) return;
+  // useEffect(() => {
+  //   if (gameLoading) return;
+  //   if (teamIdFromUrl) return;
 
-    if (!teamId) {
-      console.error(
-        "No teamId found in GameProvider. Please ensure you have set a team ID."
-      );
-      const message = {
-        id: 1,
-        text: "> Error: No team ID provided in URL or GameProvider.",
-        sender: "system" as const,
-        timestamp: new Date(),
-      };
+  //   if (!teamId) {
+  //     console.error(
+  //       "No teamId found in GameProvider. Please ensure you have set a team ID."
+  //     );
+  //     const message = {
+  //       id: 1,
+  //       text: "> Error: No team ID provided in URL or GameProvider.",
+  //       sender: "system" as const,
+  //       timestamp: new Date(),
+  //     };
 
-      setMessages([message]);
-      typeMessage(message.id, message.text);
-    }
-  }, [teamId, teamIdFromUrl, gameLoading]);
+  //     setMessages([message]);
+  //     typeMessage(message.id, message.text);
+  //   }
+  // }, [teamId, teamIdFromUrl, gameLoading]);
 
+  /**
+   *
+   */
   useEffect(() => {
     const handleCheckLocation = async () => {
-      if (!teamId) {
-        console.error("No team ID set. Cannot check location.");
-        return;
-      }
-
       if (endSequenceFromUrl) {
         const data = await scavengerHuntApi.finishGame(endSequenceFromUrl);
         if (!data.success) {
@@ -233,10 +248,10 @@ export default function Chat() {
       }
     };
 
-    if (teamId) {
+    if (teamId && userId) {
       handleCheckLocation();
     }
-  }, [teamId, levelIdFromUrl, endSequenceFromUrl]);
+  }, [userId, teamId, levelIdFromUrl, endSequenceFromUrl]);
 
   return (
     <Box

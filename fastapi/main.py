@@ -177,6 +177,20 @@ async def create_game(
         for team_level in team_levels:
             db.add(team_level)
 
+        os.makedirs(f"./games/{new_game.id}/levels")
+        with open(f"./games/{new_game.id}/game.json", "w") as gameFile:
+            game_info: dict[str, Any] = {
+                "id": new_game.id.__str__(),
+                "name": new_game.name,
+                "description": new_game.description,
+                "teamLinks": [
+                    f"{os.getenv('FRONTEND_URL')}?team-id={t.id}" for t in teams
+                ],
+                "levelLinks": [
+                    f"{os.getenv('FRONTEND_URL')}?level-id={l.id}" for l in levels
+                ],
+            }
+            json.dump(game_info, gameFile, indent=4)
         db.commit()
 
         return JSONResponse(
@@ -309,6 +323,7 @@ async def at_level(
         if level_id == "current":
             return JSONResponse(
                 content={
+                    # TODO: do not show the actual level id
                     "message": f"You are at level {current_team_level.level_id}.",
                     "level_id": str(current_team_level.level_id),
                 },
@@ -529,11 +544,20 @@ Help them discover this location through conversation while staying in character
 # route for a team sending a message to llm
 @app.post("/api/message")
 async def message(
+    user_id: Annotated[Union[str, None], Header()] = None,
     team_id: Annotated[Union[str, None], Header()] = None,
     request: MessageRequest = Body(...),
 ):
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid user id")
+
     if not team_id:
         raise HTTPException(status_code=401, detail="Invalid team id")
+
+    try:
+        UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid user id format")
 
     try:
         UUID(team_id)
@@ -559,11 +583,13 @@ async def message(
             raise HTTPException(status_code=404, detail="Team level not found")
 
         # get all messages for current team and level
-        level_messages: List[Message] = (
+        user_level_messages: List[Message] = (
             db.query(Message)
             .filter(
+                Message.user_id == user_id,
                 Message.team_id == team_id,
                 Message.level_id == team_level.level_id,
+                Message.deleted_at == None,
             )
             .order_by(Message.created_at.asc())
             .all()
@@ -589,7 +615,7 @@ async def message(
 
         # combine messages
         history: List[Dict[str, str]] = []
-        for message in level_messages:
+        for message in user_level_messages:
             history.append({"role": message.role, "content": message.text})  # type: ignore
         history.append({"role": "user", "content": request.prompt})
 
@@ -639,6 +665,84 @@ async def message(
             content={
                 "message": "Message sent successfully.",
                 "response": llm_response_text,
+            },
+            media_type="application/json",
+        )
+
+    except HTTPException as he:
+        db.rollback()
+        print(f"HTTP error: {str(he.detail)}")
+        return JSONResponse(
+            content={"error": he.detail},
+            media_type="application/json",
+            status_code=he.status_code,
+        )
+
+    except Exception as e:
+        db.rollback()
+        print(f"Error sending message: {str(e)}")
+        return JSONResponse(
+            content={"error": "Error sending message"},
+            media_type="application/json",
+            status_code=500,
+        )
+    finally:
+        db.close()
+
+
+# route for soft deleting current messages
+@app.post("/api/clear-chat")
+async def clear_chat(
+    user_id: Annotated[Union[str, None], Header()] = None,
+    team_id: Annotated[Union[str, None], Header()] = None,
+):
+
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid user id")
+
+    if not team_id:
+        raise HTTPException(status_code=401, detail="Invalid team id")
+
+    try:
+        UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid user id format")
+
+    try:
+        UUID(team_id)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid team id format")
+
+    db = SessionLocal()
+    try:
+        # get team
+        team: Team = db.query(Team).filter(Team.id == team_id).first()
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
+
+        # get current team level
+        team_level: TeamLevel = (
+            db.query(TeamLevel)
+            .filter(TeamLevel.team_id == team_id, TeamLevel.completed_at.is_(None))
+            .order_by(TeamLevel.index.asc())
+            .first()
+        )
+
+        if not team_level:
+            raise HTTPException(status_code=404, detail="Team level not found")
+
+        # soft delete previous messages for current user, team and level
+        db.query(Message).filter(
+            Message.user_id == user_id,
+            Message.team_id == team_id,
+            Message.level_id == team_level.level_id,
+            Message.deleted_at == None,
+        ).update({"deleted_at": datetime.now()})
+
+        db.commit()
+        return JSONResponse(
+            content={
+                "message": "Messages cleared successfully.",
             },
             media_type="application/json",
         )

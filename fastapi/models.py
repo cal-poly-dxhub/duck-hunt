@@ -107,6 +107,7 @@ class Team(Base, TimestampsMixin):
     game = relationship("Game", back_populates="teams")
     team_levels = relationship("TeamLevel", back_populates="team")
     messages = relationship("Message", back_populates="team")
+    users = relationship("User", back_populates="team")
 
     # repr str
     def __repr__(self):
@@ -120,9 +121,16 @@ class User(Base, TimestampsMixin):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    team_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("teams.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
 
     # relationships
-    team = relationship("Team", back_populates="user")
+    team = relationship("Team", back_populates="users")
+    messages = relationship("Message", back_populates="user")
 
     # repr str
     def __repr__(self):
