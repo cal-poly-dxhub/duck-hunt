@@ -120,9 +120,72 @@ const clearChat = async () => {
   }
 };
 
+const pingCoordinates = async () => {
+  try {
+    // get coordinates of device
+    // Function to get device coordinates using Geolocation API
+    const getCoordinates = (): Promise<{
+      latitude: number;
+      longitude: number;
+    }> => {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Geolocation is not supported by your browser"));
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+          },
+          (error) => {
+            reject(new Error(`Failed to get location: ${error.message}`));
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 2000,
+            maximumAge: 0,
+          }
+        );
+      });
+    };
+
+    const coordinates = await getCoordinates();
+
+    const response = await apiPost<{ message: string }>(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/ping-coordinates`,
+      {
+        body: coordinates,
+      }
+    );
+
+    if (!response.success) {
+      throw new Error(response.error || "Failed to ping coordinates");
+    }
+
+    return {
+      success: true,
+      message: response.data.message,
+    };
+  } catch (error) {
+    console.error("Error in pingCoordinates function:", error);
+    if ((error as { status?: number }).status === 500) {
+      return { success: false, error: "Failed to ping coordinates" };
+    } else {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+};
+
 export const scavengerHuntApi = {
   message,
   atLevel,
+  pingCoordinates,
   finishGame,
   clearChat,
 };
