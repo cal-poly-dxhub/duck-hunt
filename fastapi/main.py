@@ -9,6 +9,7 @@ from bedrock import invoke_llm, verify_location_leak
 from database import SessionLocal
 from dotenv import load_dotenv
 from models import CoordinateSnapshot, Game, Level, Message, Team, TeamLevel, User
+from prompts import DIFFICULTY_PROMPTS
 from pydantic import BaseModel
 
 from fastapi import Body, FastAPI, Form, Header, HTTPException
@@ -62,7 +63,6 @@ class LevelData(BaseModel):
     character: dict[str, Any]
     location: dict[str, Any]
     clues: list[str]
-    rules: list[str]
     max_tokens: int = 512
 
 
@@ -590,38 +590,54 @@ def finish_game(
         db.close()
 
 
-def build_system_prompt(level_data: dict[str, Any]) -> str:
-    """Build system prompt from structured level data"""
-    character = level_data["character"]
-    location = level_data["location"]
-    clues = level_data["clues"]
-    rules = level_data["rules"]
+def build_system_prompt(level_data: dict[str, Any], difficulty_level: int) -> str:
+    """Build system prompt from structured level data and difficulty level."""
+    
+    # Select difficulty prompt, defaulting to the highest level if out of bounds
+    max_difficulty = max(DIFFICULTY_PROMPTS.keys())
+    difficulty = min(difficulty_level, max_difficulty)
+    difficulty_prompt_data = DIFFICULTY_PROMPTS.get(difficulty, DIFFICULTY_PROMPTS[max_difficulty])
+    difficulty_instructions = difficulty_prompt_data["system_prompt"]
 
-    catchphrases_text = ", ".join(
-        [f"'{phrase}'" for phrase in character["catchphrases"]]
-    )
-    traits_text = "\n".join([f"- {trait}" for trait in character["traits"]])
-    location_details = " ".join(location["details"])
-    clues_text = "\n".join([f"• {clue}" for clue in clues])
-    rules_text = "\n".join([f"- {rule}" for rule in rules])
-    system_prompt = f"""You are {character["name"]}! {character["personality"]}
+    # Extract persona and level-specific details
+    character = level_data.get("character", {})
+    location = level_data.get("location", {})
+    clues = level_data.get("clues", [])
+    
+    character_name = character.get("name", "A mysterious guide")
+    character_personality = character.get("personality", "")
+    catchphrases = character.get("catchphrases", [])
+    traits = character.get("traits", [])
 
-You're helping students find a specific location - {location["description"]}. {location_details}
+    location_description = location.get("description", "a secret place")
+    location_details = location.get("details", [])
 
-CHARACTER TRAITS:
+    # Format persona details into text blocks
+    catchphrases_text = f"You sometimes use these catchphrases: {', '.join([f'{phrase}' for phrase in catchphrases])}" if catchphrases else ""
+    traits_text = "Your character traits are:\n" + "\n".join([f"- {trait}" for trait in traits]) if traits else ""
+    location_details_text = " ".join(location_details)
+    clues_text = "You have the following clues to guide them:\n" + "\n".join([f"• {clue}" for clue in clues]) if clues else "You have no clues to give for this location."
+
+    # Combine all parts into the final system prompt
+    system_prompt = f"""
+{difficulty_instructions}
+
+Here is the context for the current level:
+
+Your Persona:
+You are {character_name}.
+{character_personality}
 {traits_text}
+{catchphrases_text}
 
-USE THESE CATCHPHRASES: {catchphrases_text}
+The Secret Location:
+You are guiding players to '{location_description}'. {location_details_text}
 
-AVAILABLE CLUES TO GIVE:
+Available Clues:
 {clues_text}
 
-RULES:
-{rules_text}
-
-Help them discover this location through conversation while staying in character!"""
-
-    return system_prompt
+"""
+    return system_prompt.strip()
 
 
 # route for a team sending a message to llm
@@ -719,7 +735,7 @@ def message(
                     status_code=404, detail="Level information not found."
                 )
             level_info_json = json.load(level_info)
-            system_prompt = build_system_prompt(level_info_json)
+            system_prompt = build_system_prompt(level_info_json, team.difficulty_level)
 
         # call bedrock
         llm_response: str = invoke_llm(
