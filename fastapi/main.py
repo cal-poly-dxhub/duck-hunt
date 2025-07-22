@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Annotated, Any, Dict, List, Set, Union
 from uuid import UUID
 
-from bedrock import invoke_llm
+from bedrock import invoke_llm, verify_location_leak
 from database import SessionLocal
 from dotenv import load_dotenv
 from models import CoordinateSnapshot, Game, Level, Message, Team, TeamLevel, User
@@ -742,6 +742,13 @@ def message(
             raise HTTPException(
                 status_code=500, detail="Failed to get response from LLM."
             )
+        
+        # Verify if the location was leaked
+        location_name = level_info_json.get("location", {}).get("description", "")
+        if location_name and verify_location_leak(llm_response_text, location_name):
+            team.difficulty_level += 1
+            db.add(team)
+            print(f"Team {team.id} difficulty increased to {team.difficulty_level}")
 
         # create assistant message
         assistant_message: Message = Message(
