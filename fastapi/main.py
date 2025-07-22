@@ -62,7 +62,7 @@ class PingCoordinatesRequest(BaseModel):
 class LevelData(BaseModel):
     character: dict[str, Any]
     location: dict[str, Any]
-    clues: list[str]
+    clues: dict[str, list[str]]
     max_tokens: int = 512
 
 
@@ -602,8 +602,17 @@ def build_system_prompt(level_data: dict[str, Any], difficulty_level: int) -> st
     # Extract persona and level-specific details
     character = level_data.get("character", {})
     location = level_data.get("location", {})
-    clues = level_data.get("clues", [])
+    clues_by_difficulty = level_data.get("clues", {})
     
+    # Select the appropriate set of clues based on difficulty
+    difficulty_str = str(difficulty)
+    if difficulty_str in clues_by_difficulty:
+        selected_clues = clues_by_difficulty[difficulty_str]
+    else:
+        # Default to the hardest available clues if the current difficulty is not explicitly defined
+        highest_defined_difficulty = max(clues_by_difficulty.keys(), key=int)
+        selected_clues = clues_by_difficulty.get(highest_defined_difficulty, [])
+
     character_name = character.get("name", "A mysterious guide")
     character_personality = character.get("personality", "")
     catchphrases = character.get("catchphrases", [])
@@ -616,7 +625,7 @@ def build_system_prompt(level_data: dict[str, Any], difficulty_level: int) -> st
     catchphrases_text = f"You sometimes use these catchphrases: {', '.join([f'{phrase}' for phrase in catchphrases])}" if catchphrases else ""
     traits_text = "Your character traits are:\n" + "\n".join([f"- {trait}" for trait in traits]) if traits else ""
     location_details_text = " ".join(location_details)
-    clues_text = "You have the following clues to guide them:\n" + "\n".join([f"• {clue}" for clue in clues]) if clues else "You have no clues to give for this location."
+    clues_text = "You have the following clues to guide them:\n" + "\n".join([f"• {clue}" for clue in selected_clues]) if selected_clues else "You have no clues to give for this location."
 
     # Combine all parts into the final system prompt
     system_prompt = f"""
