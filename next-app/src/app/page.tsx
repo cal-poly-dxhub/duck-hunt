@@ -170,7 +170,7 @@ export default function Chat() {
   }, [teamIdFromUrl, teamId, setTeamId, gameLoading, userId, setUserId]);
 
   /**
-   *
+   * check if ids present
    */
   useEffect(() => {
     if (gameLoading) return;
@@ -193,7 +193,7 @@ export default function Chat() {
   }, [teamId, teamIdFromUrl, gameLoading]);
 
   /**
-   *
+   * end sequence or at level
    */
   useEffect(() => {
     const handleCheckLocation = async () => {
@@ -239,7 +239,7 @@ export default function Chat() {
           timestamp: new Date(),
         };
 
-        setMessages([systemMessage]);
+        setMessages([systemMessage, ...(data?.messageHistory ?? [])]);
         typeMessage(systemMessage.id, systemMessage.text);
         setLoading(false);
       } catch (error) {
@@ -305,7 +305,7 @@ export default function Chat() {
               return (
                 <Text
                   key={message.id}
-                  c={message.sender === "system" ? "green.4" : "green.3"}
+                  c="green.5"
                   style={{
                     fontFamily: "monospace",
                     fontSize: "1rem",

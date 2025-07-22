@@ -33,17 +33,23 @@ const message = async (prompt: string) => {
 
 const atLevel = async (levelId: string) => {
   try {
-    const response = await apiPost<{ level_id: string }>(
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/at-level/${levelId}`
-    );
+    const response = await apiPost<{
+      message: string;
+      level_id: string;
+      message_history: string[];
+    }>(`${process.env.NEXT_PUBLIC_API_BASE_URL}/at-level/${levelId}`);
 
     if (!response.success) {
       throw new Error(response.error || "Failed to get level");
     }
 
+    console.log(response.data);
+
     return {
       success: true,
+      message: response.data.message,
       level: response.data.level_id,
+      messageHistory: response.data.message_history,
     };
   } catch (error) {
     console.error("Error in atLevel function:", error);

@@ -63,7 +63,7 @@ app.add_middleware(
 
 # level count includes starting point and ending point
 @app.post("/api/create-game")
-async def create_game(
+def create_game(
     request: CreateGameRequest, api_key: Annotated[Union[str, None], Header()] = None
 ) -> JSONResponse:
     if api_key != str(os.getenv("ADMIN_API_KEY")):
@@ -214,7 +214,7 @@ async def create_game(
 
 
 @app.delete("/api/end-game/{game_id}")
-async def end_game(
+def end_game(
     game_id: str, api_key: Annotated[Union[str, None], Header()] = None
 ) -> JSONResponse:
     if api_key != str(os.getenv("ADMIN_API_KEY")):
@@ -277,12 +277,42 @@ async def end_game(
 # TEAM ROUTES
 
 
+def fetch_user_messages(
+    user_id: str, team_id: str, level_id: str
+) -> list[dict[str, Any]]:
+    db = SessionLocal()
+    db_message_history = (
+        db.query(Message)
+        .filter(
+            Message.user_id == user_id,
+            Message.team_id == team_id,
+            Message.level_id == level_id,
+        )
+        .order_by(Message.created_at.asc())
+        .all()
+    )
+
+    return [
+        {
+            "id": m.id.__str__(),
+            "text": f"$ {m.text}" if m.role.__str__() == "user" else f"> {m.text}",
+            "sender": m.role if m.role.__str__() == "user" else "system",
+            "timestamp": m.created_at.__str__(),
+        }
+        for m in db_message_history
+    ]
+
+
 # route for a team to update their current level
 @app.post("/api/at-level/{level_id}")
-async def at_level(
+def at_level(
     level_id: str,
+    user_id: Annotated[Union[str, None], Header()] = None,
     team_id: Annotated[Union[str, None], Header()] = None,
 ):
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid user id")
+
     if not team_id:
         raise HTTPException(status_code=401, detail="Invalid team id")
 
@@ -290,6 +320,11 @@ async def at_level(
         UUID(team_id)
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid team id format")
+
+    try:
+        UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid user id format")
 
     db = SessionLocal()
     try:
@@ -325,6 +360,7 @@ async def at_level(
                     # TODO: do not show the actual level id
                     "message": f"You are at level {current_team_level.level_id}.",
                     "level_id": str(current_team_level.level_id),
+                    "message_history": fetch_user_messages(user_id, team_id, level_id),
                 },
                 media_type="application/json",
             )
@@ -345,6 +381,7 @@ async def at_level(
                 content={
                     "message": f"You are at level {current_team_level.level_id}.",
                     "level_id": str(current_team_level.level_id),
+                    "message_history": fetch_user_messages(user_id, team_id, level_id),
                 },
                 media_type="application/json",
             )
@@ -367,6 +404,7 @@ async def at_level(
                 content={
                     "message": f"Congratulations. You are now at level {next_team_level.level_id}.",
                     "level_id": str(next_team_level.level_id),
+                    "message_history": [],  # no messages if new level
                 },
                 media_type="application/json",
             )
@@ -400,7 +438,7 @@ async def at_level(
 
 # route for when team finishes all levels
 @app.post("/api/finish-game/{end_sequence}")
-async def finish_game(
+def finish_game(
     end_sequence: str,
     team_id: Annotated[Union[str, None], Header()] = None,
 ):
@@ -543,7 +581,7 @@ Help them discover this location through conversation while staying in character
 
 # route for a team sending a message to llm
 @app.post("/api/message")
-async def message(
+def message(
     user_id: Annotated[Union[str, None], Header()] = None,
     team_id: Annotated[Union[str, None], Header()] = None,
     request: MessageRequest = Body(...),
@@ -701,7 +739,7 @@ async def message(
 
 # route for soft deleting current messages
 @app.post("/api/clear-chat")
-async def clear_chat(
+def clear_chat(
     user_id: Annotated[Union[str, None], Header()] = None,
     team_id: Annotated[Union[str, None], Header()] = None,
 ):
