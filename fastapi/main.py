@@ -60,8 +60,8 @@ class PingCoordinatesRequest(BaseModel):
 
 
 class LevelData(BaseModel):
-    character: dict[str, Any]
-    location: dict[str, Any]
+    character_name: str
+    location: dict[str, Union[str, float]]
     clues: dict[str, list[str]]
     max_tokens: int = 512
 
@@ -600,7 +600,7 @@ def build_system_prompt(level_data: dict[str, Any], difficulty_level: int) -> st
     difficulty_instructions = difficulty_prompt_data["system_prompt"]
 
     # Extract persona and level-specific details
-    character = level_data.get("character", {})
+    character_name = level_data.get("character_name", "A mysterious guide")
     location = level_data.get("location", {})
     clues_by_difficulty = level_data.get("clues", {})
     
@@ -610,21 +610,12 @@ def build_system_prompt(level_data: dict[str, Any], difficulty_level: int) -> st
         selected_clues = clues_by_difficulty[difficulty_str]
     else:
         # Default to the hardest available clues if the current difficulty is not explicitly defined
-        highest_defined_difficulty = max(clues_by_difficulty.keys(), key=int)
+        highest_defined_difficulty = max(clues_by_difficulty.keys(), key=int) if clues_by_difficulty else "0"
         selected_clues = clues_by_difficulty.get(highest_defined_difficulty, [])
 
-    character_name = character.get("name", "A mysterious guide")
-    character_personality = character.get("personality", "")
-    catchphrases = character.get("catchphrases", [])
-    traits = character.get("traits", [])
-
     location_description = location.get("description", "a secret place")
-    location_details = location.get("details", [])
 
     # Format persona details into text blocks
-    catchphrases_text = f"You sometimes use these catchphrases: {', '.join([f'{phrase}' for phrase in catchphrases])}" if catchphrases else ""
-    traits_text = "Your character traits are:\n" + "\n".join([f"- {trait}" for trait in traits]) if traits else ""
-    location_details_text = " ".join(location_details)
     clues_text = "You have the following clues to guide them:\n" + "\n".join([f"• {clue}" for clue in selected_clues]) if selected_clues else "You have no clues to give for this location."
 
     # Combine all parts into the final system prompt
@@ -635,16 +626,12 @@ Here is the context for the current level:
 
 Your Persona:
 You are {character_name}.
-{character_personality}
-{traits_text}
-{catchphrases_text}
 
 The Secret Location:
-You are guiding players to '{location_description}'. {location_details_text}
+You are guiding players to '{location_description}'.
 
 Available Clues:
 {clues_text}
-
 """
     return system_prompt.strip()
 
