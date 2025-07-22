@@ -9,7 +9,7 @@ from bedrock import invoke_llm, verify_location_leak
 from database import SessionLocal
 from dotenv import load_dotenv
 from models import CoordinateSnapshot, Game, Level, Message, Team, TeamLevel, User
-from prompts import DIFFICULTY_PROMPTS
+from prompts import DIFFICULTY_PROMPTS, DIFFICULTY_MODEL_IDS
 from pydantic import BaseModel
 
 from fastapi import Body, FastAPI, Form, Header, HTTPException
@@ -746,16 +746,21 @@ def message(
             level_info_json = json.load(level_info)
             system_prompt = build_system_prompt(level_info_json, team.difficulty_level)
 
+        # Select model based on difficulty
+        max_difficulty_model = max(DIFFICULTY_MODEL_IDS.keys())
+        model_id = DIFFICULTY_MODEL_IDS.get(team.difficulty_level, DIFFICULTY_MODEL_IDS[max_difficulty_model])
+
         # call bedrock
         llm_response: str = invoke_llm(
-            json.dumps(
+            request_body=json.dumps(
                 {
                     "anthropic_version": "bedrock-2023-05-31",
                     "messages": history,
                     "max_tokens": level_info_json.get("max_tokens", 512),
                     "system": system_prompt,
                 }
-            )
+            ),
+            model_id=model_id,
         )
 
         llm_response_body: Dict[str, Union[str, List[Dict[str, str]]]] = json.loads(
