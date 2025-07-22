@@ -8,7 +8,7 @@ from uuid import UUID
 from bedrock import invoke_llm
 from database import SessionLocal
 from dotenv import load_dotenv
-from models import Game, Level, Message, Team, TeamLevel
+from models import Game, Level, Message, Team, TeamLevel, User
 from pydantic import BaseModel
 
 from fastapi import Body, FastAPI, Form, Header, HTTPException
@@ -63,7 +63,7 @@ app.add_middleware(
 
 # level count includes starting point and ending point
 @app.post("/api/create-game")
-async def create_game(
+def create_game(
     request: CreateGameRequest, api_key: Annotated[Union[str, None], Header()] = None
 ) -> JSONResponse:
     if api_key != str(os.getenv("ADMIN_API_KEY")):
@@ -177,6 +177,20 @@ async def create_game(
         for team_level in team_levels:
             db.add(team_level)
 
+        os.makedirs(f"./games/{new_game.id}/levels")
+        with open(f"./games/{new_game.id}/game.json", "w") as gameFile:
+            game_info: dict[str, Any] = {
+                "id": new_game.id.__str__(),
+                "name": new_game.name,
+                "description": new_game.description,
+                "teamLinks": [
+                    f"{os.getenv('FRONTEND_URL')}?team-id={t.id}" for t in teams
+                ],
+                "levelLinks": [
+                    f"{os.getenv('FRONTEND_URL')}?level-id={l.id}" for l in levels
+                ],
+            }
+            json.dump(game_info, gameFile, indent=4)
         db.commit()
 
         return JSONResponse(
@@ -200,7 +214,7 @@ async def create_game(
 
 
 @app.delete("/api/end-game/{game_id}")
-async def end_game(
+def end_game(
     game_id: str, api_key: Annotated[Union[str, None], Header()] = None
 ) -> JSONResponse:
     if api_key != str(os.getenv("ADMIN_API_KEY")):
@@ -263,12 +277,41 @@ async def end_game(
 # TEAM ROUTES
 
 
+def fetch_user_messages(
+    user_id: str, team_id: str, level_id: str
+) -> list[dict[str, Any]]:
+    db = SessionLocal()
+    db_message_history = (
+        db.query(Message)
+        .filter(
+            Message.user_id == user_id,
+            Message.team_id == team_id,
+            Message.level_id == level_id,
+        )
+        .order_by(Message.created_at.asc())
+        .all()
+    )
+
+    return [
+        {
+            "id": m.id.__str__(),
+            "text": f"$ {m.text}" if m.role.__str__() == "user" else f"> {m.text}",
+            "sender": m.role if m.role.__str__() == "user" else "system",
+            "timestamp": m.created_at.__str__(),
+        }
+        for m in db_message_history
+    ]
+
+
 # route for a team to update their current level
 @app.post("/api/at-level/{level_id}")
-async def at_level(
+def at_level(
     level_id: str,
+    user_id: Annotated[Union[str, None], Header()] = None,
     team_id: Annotated[Union[str, None], Header()] = None,
 ):
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid user id")
 
     if not team_id:
         raise HTTPException(status_code=401, detail="Invalid team id")
@@ -277,6 +320,11 @@ async def at_level(
         UUID(team_id)
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid team id format")
+
+    try:
+        UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid user id format")
 
     db = SessionLocal()
     try:
@@ -309,8 +357,10 @@ async def at_level(
         if level_id == "current":
             return JSONResponse(
                 content={
+                    # TODO: do not show the actual level id
                     "message": f"You are at level {current_team_level.level_id}.",
                     "level_id": str(current_team_level.level_id),
+                    "message_history": fetch_user_messages(user_id, team_id, level_id),
                 },
                 media_type="application/json",
             )
@@ -331,6 +381,7 @@ async def at_level(
                 content={
                     "message": f"You are at level {current_team_level.level_id}.",
                     "level_id": str(current_team_level.level_id),
+                    "message_history": fetch_user_messages(user_id, team_id, level_id),
                 },
                 media_type="application/json",
             )
@@ -343,6 +394,7 @@ async def at_level(
                 break
 
         if next_team_level and next_team_level.level_id == submitted_level_id:  # type: ignore
+            # TODO: photo submission
             # mark current level as completed and advance
             db.query(TeamLevel).filter(TeamLevel.id == current_team_level.id).update(
                 {"completed_at": datetime.now()}
@@ -352,6 +404,7 @@ async def at_level(
                 content={
                     "message": f"Congratulations. You are now at level {next_team_level.level_id}.",
                     "level_id": str(next_team_level.level_id),
+                    "message_history": [],  # no messages if new level
                 },
                 media_type="application/json",
             )
@@ -385,7 +438,7 @@ async def at_level(
 
 # route for when team finishes all levels
 @app.post("/api/finish-game/{end_sequence}")
-async def finish_game(
+def finish_game(
     end_sequence: str,
     team_id: Annotated[Union[str, None], Header()] = None,
 ):
@@ -528,12 +581,21 @@ Help them discover this location through conversation while staying in character
 
 # route for a team sending a message to llm
 @app.post("/api/message")
-async def message(
+def message(
+    user_id: Annotated[Union[str, None], Header()] = None,
     team_id: Annotated[Union[str, None], Header()] = None,
     request: MessageRequest = Body(...),
 ):
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid user id")
+
     if not team_id:
         raise HTTPException(status_code=401, detail="Invalid team id")
+
+    try:
+        UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid user id format")
 
     try:
         UUID(team_id)
@@ -547,6 +609,13 @@ async def message(
         if not team:
             raise HTTPException(status_code=404, detail="Team not found")
 
+        # get or create user
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            user = User(id=UUID(user_id), team_id=team.id)
+            db.add(user)
+            db.commit()
+
         # get current team level
         team_level: TeamLevel = (
             db.query(TeamLevel)
@@ -559,18 +628,20 @@ async def message(
             raise HTTPException(status_code=404, detail="Team level not found")
 
         # get all messages for current team and level
-        level_messages: List[Message] = (
+        user_level_messages: List[Message] = (
             db.query(Message)
             .filter(
+                Message.user_id == user_id,
                 Message.team_id == team_id,
                 Message.level_id == team_level.level_id,
+                Message.deleted_at == None,
             )
             .order_by(Message.created_at.asc())
             .all()
         )
 
         # if latest message is from assistant, user must wait for response
-        if level_messages and level_messages[-1].role == "user":  # type: ignore
+        if user_level_messages and user_level_messages[-1].role == "user":  # type: ignore
             raise HTTPException(
                 status_code=400,
                 detail="You must wait for the assistant's response before sending a new message.",
@@ -578,6 +649,7 @@ async def message(
 
         # user message
         user_message: Message = Message(
+            user_id=UUID(user_id),
             team_id=team.id,
             game_id=team.game_id,
             level_id=team_level.level_id,
@@ -589,7 +661,7 @@ async def message(
 
         # combine messages
         history: List[Dict[str, str]] = []
-        for message in level_messages:
+        for message in user_level_messages:
             history.append({"role": message.role, "content": message.text})  # type: ignore
         history.append({"role": "user", "content": request.prompt})
 
@@ -626,6 +698,7 @@ async def message(
 
         # create assistant message
         assistant_message: Message = Message(
+            user_id=UUID(user_id),
             team_id=team.id,
             game_id=team.game_id,
             level_id=team_level.level_id,
@@ -639,6 +712,84 @@ async def message(
             content={
                 "message": "Message sent successfully.",
                 "response": llm_response_text,
+            },
+            media_type="application/json",
+        )
+
+    except HTTPException as he:
+        db.rollback()
+        print(f"HTTP error: {str(he.detail)}")
+        return JSONResponse(
+            content={"error": he.detail},
+            media_type="application/json",
+            status_code=he.status_code,
+        )
+
+    except Exception as e:
+        db.rollback()
+        print(f"Error sending message: {str(e)}")
+        return JSONResponse(
+            content={"error": "Error sending message"},
+            media_type="application/json",
+            status_code=500,
+        )
+    finally:
+        db.close()
+
+
+# route for soft deleting current messages
+@app.post("/api/clear-chat")
+def clear_chat(
+    user_id: Annotated[Union[str, None], Header()] = None,
+    team_id: Annotated[Union[str, None], Header()] = None,
+):
+
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid user id")
+
+    if not team_id:
+        raise HTTPException(status_code=401, detail="Invalid team id")
+
+    try:
+        UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid user id format")
+
+    try:
+        UUID(team_id)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid team id format")
+
+    db = SessionLocal()
+    try:
+        # get team
+        team: Team = db.query(Team).filter(Team.id == team_id).first()
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
+
+        # get current team level
+        team_level: TeamLevel = (
+            db.query(TeamLevel)
+            .filter(TeamLevel.team_id == team_id, TeamLevel.completed_at.is_(None))
+            .order_by(TeamLevel.index.asc())
+            .first()
+        )
+
+        if not team_level:
+            raise HTTPException(status_code=404, detail="Team level not found")
+
+        # soft delete previous messages for current user, team and level
+        db.query(Message).filter(
+            Message.user_id == user_id,
+            Message.team_id == team_id,
+            Message.level_id == team_level.level_id,
+            Message.deleted_at == None,
+        ).update({"deleted_at": datetime.now()})
+
+        db.commit()
+        return JSONResponse(
+            content={
+                "message": "Messages cleared successfully.",
             },
             media_type="application/json",
         )

@@ -2,7 +2,7 @@
 
 ## you may ask: why a monolith?
 
-- because it doesnt need to be scalable this is like 50 ppl max ata
+- because it doesnt need to be scalable this is like 150 ppl max atm
 
 ## setup python
 
@@ -29,14 +29,15 @@ createdb duck_hunt
 4. create and activate virtual environment
 
 ```bash
-cd fastapi
 python3.9 -m venv .venv
 source .venv/bin/activate
+pip install -r fastapi/requirements.txt
 ```
 
 5. create environment file
 
 ```bash
+cd fastapi
 cp .env.example .env
 ```
 
@@ -57,14 +58,34 @@ pip install -r requirements.txt
 7. setup alembic
 
 ```bash
-# Make sure you're in the fastapi directory
-cd fastapi
+alembic init alembic
+```
+
+8. update `alembic.ini` to point to your database
+
+change the line in `alembic.ini`:
+
+```ini
+sqlalchemy.url = postgresql://your_username@localhost:5432/duck_hunt
+```
+
+9. update `alembic/env.py` to import your models
+
+```python
+# target_metadata = None # comment this line
+from models import Base  # import your models here
+target_metadata = Base.metadata
+```
+
+10. create the initial migration
+
+```bash
 alembic revision --autogenerate -m "initial migration"
 alembic upgrade head
 cd ..
 ```
 
-8. start the api
+11. start the api
 
 ```bash
 fastapi run main.py

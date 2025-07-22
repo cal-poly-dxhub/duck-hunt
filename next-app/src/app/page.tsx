@@ -13,7 +13,7 @@ import {
   TextInput,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
-import { IconSend } from "@tabler/icons-react";
+import { IconSend, IconTrash } from "@tabler/icons-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -39,7 +39,13 @@ export default function Chat() {
     {}
   );
 
-  const { teamId, setTeamId, isLoading: gameLoading } = useGame();
+  const {
+    userId,
+    teamId,
+    setUserId,
+    setTeamId,
+    isLoading: gameLoading,
+  } = useGame();
 
   const typeMessage = async (messageId: number, fullText: string) => {
     for (let i = 0; i <= fullText.length; i++) {
@@ -120,13 +126,30 @@ export default function Chat() {
     }
   };
 
+  const handleClearChat = () => {
+    scavengerHuntApi.clearChat();
+    setMessages([]);
+    setTypingMessages({});
+  };
+
   const searchParams = useSearchParams();
   const teamIdFromUrl = searchParams.get("team-id");
   const levelIdFromUrl = searchParams.get("level-id");
   const endSequenceFromUrl = searchParams.get("end-sequence");
 
+  /**
+   *
+   */
   useEffect(() => {
-    if (gameLoading) return;
+    if (gameLoading) {
+      return;
+    }
+
+    if (!userId) {
+      const newUserId = crypto.randomUUID();
+      console.warn("No userId found in GameProvider. Generating a new one.");
+      setUserId(newUserId);
+    }
 
     if (teamIdFromUrl) {
       console.warn(
@@ -144,8 +167,11 @@ export default function Chat() {
       setMessages([message]);
       typeMessage(message.id, message.text);
     }
-  }, [teamIdFromUrl, teamId, setTeamId, gameLoading]);
+  }, [teamIdFromUrl, teamId, setTeamId, gameLoading, userId, setUserId]);
 
+  /**
+   * check if ids present
+   */
   useEffect(() => {
     if (gameLoading) return;
     if (teamIdFromUrl) return;
@@ -166,13 +192,11 @@ export default function Chat() {
     }
   }, [teamId, teamIdFromUrl, gameLoading]);
 
+  /**
+   * end sequence or at level
+   */
   useEffect(() => {
     const handleCheckLocation = async () => {
-      if (!teamId) {
-        console.error("No team ID set. Cannot check location.");
-        return;
-      }
-
       if (endSequenceFromUrl) {
         const data = await scavengerHuntApi.finishGame(endSequenceFromUrl);
         if (!data.success) {
@@ -215,7 +239,7 @@ export default function Chat() {
           timestamp: new Date(),
         };
 
-        setMessages([systemMessage]);
+        setMessages([systemMessage, ...(data?.messageHistory ?? [])]);
         typeMessage(systemMessage.id, systemMessage.text);
         setLoading(false);
       } catch (error) {
@@ -233,10 +257,11 @@ export default function Chat() {
       }
     };
 
-    if (teamId) {
+    if (teamId && userId) {
       handleCheckLocation();
     }
-  }, [teamId, levelIdFromUrl, endSequenceFromUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, teamId, levelIdFromUrl, endSequenceFromUrl]);
 
   return (
     <Box
@@ -280,7 +305,7 @@ export default function Chat() {
               return (
                 <Text
                   key={message.id}
-                  c={message.sender === "system" ? "green.4" : "green.3"}
+                  c="green.5"
                   style={{
                     fontFamily: "monospace",
                     fontSize: "1rem",
@@ -381,6 +406,16 @@ export default function Chat() {
             aria-label="Send command"
           >
             <IconSend size="1.1rem" />
+          </ActionIcon>
+          <ActionIcon
+            size="lg"
+            variant="subtle"
+            color="red"
+            onClick={handleClearChat}
+            disabled={loading || messages.length === 0}
+            aria-label="Clear chat"
+          >
+            <IconTrash size="1.1rem" />
           </ActionIcon>
         </Flex>
       </Container>
