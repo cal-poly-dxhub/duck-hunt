@@ -2,7 +2,7 @@ import json
 import os
 import random
 from datetime import datetime
-from typing import Annotated, Any, Dict, List, Set, Union
+from typing import Annotated, Any, Dict, List, Set, Union, Optional
 from uuid import UUID
 
 from bedrock import invoke_llm, verify_location_leak
@@ -22,9 +22,10 @@ load_dotenv()
 class CreateGameRequest(BaseModel):
     name: str
     description: str
-    level_count: int
     team_count: int
+    level_count: int = 0  # Now optional, will be derived from config if provided
     team_names: Annotated[Union[list[str], None], Form()] = None
+    config_file: Optional[str] = None
     # team_levels: Annotated[Union[list[int], None], Form()] = None
 
     """
@@ -60,7 +61,7 @@ class PingCoordinatesRequest(BaseModel):
 
 
 class LevelData(BaseModel):
-    character_name: str
+    character: dict[str, Any]
     location: dict[str, Union[str, float]]
     clues: dict[str, list[str]]
     max_tokens: int = 512
@@ -89,12 +90,20 @@ def create_game(
     if api_key != str(os.getenv("ADMIN_API_KEY")):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-    # all games need at least 2 levels (start and end)
-    if request.level_count < 2:
-        raise HTTPException(status_code=400, detail="Level count must be at least 2.")
-
     db = SessionLocal()
     try:
+        game_config = None
+        if request.config_file:
+            config_path = f"./fastapi/game_configs/{request.config_file}"
+            if not os.path.exists(config_path):
+                raise HTTPException(status_code=404, detail=f"Config file not found: {request.config_file}")
+            with open(config_path, "r") as f:
+                game_config = json.load(f)
+            request.level_count = len(game_config)
+
+        if request.level_count < 1:
+            raise HTTPException(status_code=400, detail="A game must have at least one level.")
+
         new_game = Game(
             name=request.name,
             description=request.description,
@@ -105,6 +114,17 @@ def create_game(
         levels: List[Level] = [
             Level(game_id=new_game.id) for _ in range(request.level_count)
         ]
+        
+        if game_config:
+            level_data_map = {}
+            for i, (level_key, level_data) in enumerate(game_config.items()):
+                level_id = levels[i].id
+                level_data_map[level_id] = level_data
+                level_dir = f"./fastapi/games/{new_game.id}/levels"
+                os.makedirs(level_dir, exist_ok=True)
+                file_path = f"{level_dir}/{level_id}.json"
+                with open(file_path, "w") as f:
+                    json.dump(level_data, f, indent=4)
 
         # handle custom team names
         if request.team_names and len(request.team_names) == request.team_count:
@@ -197,8 +217,8 @@ def create_game(
         for team_level in team_levels:
             db.add(team_level)
 
-        os.makedirs(f"./games/{new_game.id}/levels")
-        with open(f"./games/{new_game.id}/game.json", "w") as gameFile:
+        os.makedirs(f"./fastapi/games/{new_game.id}/levels", exist_ok=True)
+        with open(f"./fastapi/games/{new_game.id}/game.json", "w") as gameFile:
             game_info: dict[str, Any] = {
                 "id": new_game.id.__str__(),
                 "name": new_game.name,
@@ -297,7 +317,7 @@ def upload_level_data(
             raise HTTPException(status_code=404, detail="Level not found")
 
         game_id = level.game_id
-        level_dir = f"./games/{game_id}/levels"
+        level_dir = f"./fastapi/games/{game_id}/levels"
         os.makedirs(level_dir, exist_ok=True)
 
         file_path = f"{level_dir}/{level_id}.json"
@@ -503,7 +523,7 @@ def finish_game(
 
         # load game config to get end sequence
         try:
-            with open(f"./games/{team.game_id}/config.json", "r") as config_file:
+            with open(f"./fastapi/games/{team.game_id}/config.json", "r") as config_file:
                 config_data = json.load(config_file)
                 expected_end_sequence = config_data.get("endSequence")
         except FileNotFoundError:
@@ -600,7 +620,7 @@ def build_system_prompt(level_data: dict[str, Any], difficulty_level: int) -> st
     difficulty_instructions = difficulty_prompt_data["system_prompt"]
 
     # Extract persona and level-specific details
-    character_name = level_data.get("character_name", "A mysterious guide")
+    character = level_data.get("character", {})
     location = level_data.get("location", {})
     clues_by_difficulty = level_data.get("clues", {})
     
@@ -613,6 +633,8 @@ def build_system_prompt(level_data: dict[str, Any], difficulty_level: int) -> st
         highest_defined_difficulty = max(clues_by_difficulty.keys(), key=int) if clues_by_difficulty else "0"
         selected_clues = clues_by_difficulty.get(highest_defined_difficulty, [])
 
+    character_name = character.get("name", "A mysterious guide")
+    character_personality = character.get("personality", "")
     location_description = location.get("description", "a secret place")
 
     # Format persona details into text blocks
@@ -626,6 +648,7 @@ Here is the context for the current level:
 
 Your Persona:
 You are {character_name}.
+{character_personality}
 
 The Secret Location:
 You are guiding players to '{location_description}'.
@@ -724,7 +747,7 @@ def message(
 
         # load level data and build system prompt
         with open(
-            f"./games/{team.game_id}/levels/{team_level.level_id}.json", "r"
+            f"./fastapi/games/{team.game_id}/levels/{team_level.level_id}.json", "r"
         ) as level_info:
             if not level_info:
                 raise HTTPException(
