@@ -33,17 +33,23 @@ const message = async (prompt: string) => {
 
 const atLevel = async (levelId: string) => {
   try {
-    const response = await apiPost<{ level_id: string }>(
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/at-level/${levelId}`
-    );
+    const response = await apiPost<{
+      message: string;
+      level_id: string;
+      message_history: string[];
+    }>(`${process.env.NEXT_PUBLIC_API_BASE_URL}/at-level/${levelId}`);
 
     if (!response.success) {
       throw new Error(response.error || "Failed to get level");
     }
 
+    console.log(response.data);
+
     return {
       success: true,
+      message: response.data.message,
       level: response.data.level_id,
+      messageHistory: response.data.message_history,
     };
   } catch (error) {
     console.error("Error in atLevel function:", error);
@@ -87,8 +93,36 @@ const finishGame = async (endSequence: string) => {
   }
 };
 
+const clearChat = async () => {
+  try {
+    const response = await apiPost(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/clear-chat`
+    );
+
+    if (!response.success) {
+      throw new Error(response.error || "Failed to clear chat");
+    }
+
+    return {
+      success: true,
+      message: "Chat cleared successfully",
+    };
+  } catch (error) {
+    console.error("Error in clearChat function:", error);
+    if ((error as { status?: number }).status === 500) {
+      return { success: false, error: "Failed to clear chat" };
+    } else {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+};
+
 export const scavengerHuntApi = {
   message,
   atLevel,
   finishGame,
+  clearChat,
 };

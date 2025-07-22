@@ -1,7 +1,7 @@
 .venv
 __pycache__/
 .env
-assets/*
+assets/
 temp-*
 alembic.ini
 alembic/versions/*
