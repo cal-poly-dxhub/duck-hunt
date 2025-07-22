@@ -138,7 +138,7 @@ export default function Chat() {
   const endSequenceFromUrl = searchParams.get("end-sequence");
 
   /**
-   *
+   * team id
    */
   useEffect(() => {
     if (gameLoading) {
@@ -262,6 +262,17 @@ export default function Chat() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, teamId, levelIdFromUrl, endSequenceFromUrl]);
+
+  /**
+   * ping location
+   */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      scavengerHuntApi.pingCoordinates();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <Box

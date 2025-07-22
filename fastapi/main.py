@@ -8,7 +8,7 @@ from uuid import UUID
 from bedrock import invoke_llm
 from database import SessionLocal
 from dotenv import load_dotenv
-from models import Game, Level, Message, Team, TeamLevel, User
+from models import CoordinateSnapshot, Game, Level, Message, Team, TeamLevel, User
 from pydantic import BaseModel
 
 from fastapi import Body, FastAPI, Form, Header, HTTPException
@@ -42,6 +42,18 @@ class MessageRequest(BaseModel):
     """
     {
         "prompt": "what is the name of the location"
+    }
+    """
+
+
+class PingCoordinatesRequest(BaseModel):
+    latitude: float
+    longitude: float
+
+    """
+    {
+        "latitude": 37.7749,
+        "longitude": -122.4194
     }
     """
 
@@ -790,6 +802,79 @@ def clear_chat(
         return JSONResponse(
             content={
                 "message": "Messages cleared successfully.",
+            },
+            media_type="application/json",
+        )
+
+    except HTTPException as he:
+        db.rollback()
+        print(f"HTTP error: {str(he.detail)}")
+        return JSONResponse(
+            content={"error": he.detail},
+            media_type="application/json",
+            status_code=he.status_code,
+        )
+
+    except Exception as e:
+        db.rollback()
+        print(f"Error sending message: {str(e)}")
+        return JSONResponse(
+            content={"error": "Error sending message"},
+            media_type="application/json",
+            status_code=500,
+        )
+    finally:
+        db.close()
+
+
+# route for getting user coordinates
+@app.post("/api/ping-coordinates")
+def ping_coordinates(
+    user_id: Annotated[Union[str, None], Header()] = None,
+    team_id: Annotated[Union[str, None], Header()] = None,
+    request: PingCoordinatesRequest = Body(...),
+):
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid user id")
+
+    if not team_id:
+        raise HTTPException(status_code=401, detail="Invalid team id")
+
+    try:
+        UUID(user_id)
+    except:
+        raise HTTPException(status_code=401, detail="Invalid user id format")
+
+    try:
+        UUID(team_id)
+    except:
+        raise HTTPException(status_code=401, detail="Invalid team id format")
+
+    db = SessionLocal()
+    try:
+        # get team
+        team: Team = db.query(Team).filter(Team.id == team_id).first()
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
+
+        user: User = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # create coordinate snapshot
+        coordinate_snapshot: CoordinateSnapshot = CoordinateSnapshot(
+            user_id=user.id,
+            team_id=team.id,
+            latitude=request.latitude,
+            longitude=request.longitude,
+        )
+
+        db.add(coordinate_snapshot)
+        db.commit()
+
+        return JSONResponse(
+            content={
+                "message": "Coordinate snapshot created successfully.",
             },
             media_type="application/json",
         )
