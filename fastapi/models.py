@@ -104,6 +104,7 @@ class Team(Base, TimestampsMixin):
     game_id = Column(
         UUID(as_uuid=True), ForeignKey("games.id", ondelete="CASCADE"), nullable=False
     )
+    difficulty_level = Column(Integer, nullable=False, default=0)
 
     # relationships
     game = relationship("Game", back_populates="teams")
