@@ -87,8 +87,36 @@ const finishGame = async (endSequence: string) => {
   }
 };
 
+const clearChat = async () => {
+  try {
+    const response = await apiPost(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/clear-chat`
+    );
+
+    if (!response.success) {
+      throw new Error(response.error || "Failed to clear chat");
+    }
+
+    return {
+      success: true,
+      message: "Chat cleared successfully",
+    };
+  } catch (error) {
+    console.error("Error in clearChat function:", error);
+    if ((error as { status?: number }).status === 500) {
+      return { success: false, error: "Failed to clear chat" };
+    } else {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+};
+
 export const scavengerHuntApi = {
   message,
   atLevel,
   finishGame,
+  clearChat,
 };

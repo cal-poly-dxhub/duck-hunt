@@ -357,6 +357,7 @@ async def at_level(
                 break
 
         if next_team_level and next_team_level.level_id == submitted_level_id:  # type: ignore
+            # TODO: photo submission
             # mark current level as completed and advance
             db.query(TeamLevel).filter(TeamLevel.id == current_team_level.id).update(
                 {"completed_at": datetime.now()}

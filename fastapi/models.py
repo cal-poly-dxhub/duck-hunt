@@ -34,6 +34,7 @@ class Game(Base, TimestampsMixin):
     teams = relationship("Team", back_populates="game")
     levels = relationship("Level", back_populates="game")
     messages = relationship("Message", back_populates="game")
+    photos = relationship("Photo", back_populates="game")
 
     # repr str
     def __repr__(self):
@@ -54,6 +55,7 @@ class Level(Base, TimestampsMixin):
     game = relationship("Game", back_populates="levels")
     team_levels = relationship("TeamLevel", back_populates="level")
     messages = relationship("Message", back_populates="level")
+    photos = relationship("Photo", back_populates="level")
 
     # repr str
     def __repr__(self):
@@ -108,6 +110,8 @@ class Team(Base, TimestampsMixin):
     team_levels = relationship("TeamLevel", back_populates="team")
     messages = relationship("Message", back_populates="team")
     users = relationship("User", back_populates="team")
+    photos = relationship("Photo", back_populates="team")
+    coordinate_snapshots = relationship("CoordinateSnapshot", back_populates="team")
 
     # repr str
     def __repr__(self):
@@ -131,6 +135,8 @@ class User(Base, TimestampsMixin):
     # relationships
     team = relationship("Team", back_populates="users")
     messages = relationship("Message", back_populates="user")
+    photos = relationship("Photo", back_populates="user")
+    coordinate_snapshots = relationship("CoordinateSnapshot", back_populates="user")
 
     # repr str
     def __repr__(self):
@@ -183,3 +189,78 @@ class Message(Base, TimestampsMixin):
 
     def __str__(self):
         return f"Message {self.id} (User: {self.user_id}, Team: {self.team_id}, Game: {self.game_id}, Level: {self.level_id}, Role: {self.role})"
+
+
+class Photo(Base, TimestampsMixin):
+    __tablename__ = "photos"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    team_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("teams.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    game_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("games.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    level_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("levels.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    url = Column(String, nullable=False)
+
+    # relationships
+    user = relationship("User", back_populates="photos")
+    team = relationship("Team", back_populates="photos")
+    game = relationship("Game", back_populates="photos")
+    level = relationship("Level", back_populates="photos")
+
+    # repr str
+    def __repr__(self):
+        return f"<Photo(id={self.id}, user_id={self.user_id}, team_id={self.team_id}, game_id={self.game_id}, level_id={self.level_id}, url={self.url})>"
+
+    def __str__(self):
+        return f"Photo {self.id} (User: {self.user_id}, Team: {self.team_id}, Game: {self.game_id}, Level: {self.level_id}, URL: {self.url})"
+
+
+class CoordinateSnapshot(Base, TimestampsMixin):
+    __tablename__ = "coordinate_snapshots"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    team_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("teams.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    latitude = Column(String, nullable=False)
+    longitude = Column(String, nullable=False)
+
+    # relationships
+    user = relationship("User", back_populates="coordinate_snapshots")
+    team = relationship("Team", back_populates="coordinate_snapshots")
+
+    # repr str
+    def __repr__(self):
+        return f"<CoordinateSnapshots(id={self.id}, team_id={self.team_id}, latitude={self.latitude}, longitude={self.longitude})>"
+
+    def __str__(self):
+        return f"CoordinateSnapshots {self.id} (Team: {self.team_id}, Latitude: {self.latitude}, Longitude: {self.longitude})"

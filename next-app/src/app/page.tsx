@@ -13,7 +13,7 @@ import {
   TextInput,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
-import { IconSend } from "@tabler/icons-react";
+import { IconSend, IconTrash } from "@tabler/icons-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -126,13 +126,19 @@ export default function Chat() {
     }
   };
 
+  const handleClearChat = () => {
+    scavengerHuntApi.clearChat();
+    setMessages([]);
+    setTypingMessages({});
+  };
+
   const searchParams = useSearchParams();
   const teamIdFromUrl = searchParams.get("team-id");
   const levelIdFromUrl = searchParams.get("level-id");
   const endSequenceFromUrl = searchParams.get("end-sequence");
 
   /**
-   * setup
+   *
    */
   useEffect(() => {
     if (gameLoading) {
@@ -163,6 +169,9 @@ export default function Chat() {
     }
   }, [teamIdFromUrl, teamId, setTeamId, gameLoading, userId, setUserId]);
 
+  /**
+   *
+   */
   useEffect(() => {
     if (gameLoading) return;
     if (teamIdFromUrl) return;
@@ -251,6 +260,7 @@ export default function Chat() {
     if (teamId && userId) {
       handleCheckLocation();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, teamId, levelIdFromUrl, endSequenceFromUrl]);
 
   return (
@@ -396,6 +406,16 @@ export default function Chat() {
             aria-label="Send command"
           >
             <IconSend size="1.1rem" />
+          </ActionIcon>
+          <ActionIcon
+            size="lg"
+            variant="subtle"
+            color="red"
+            onClick={handleClearChat}
+            disabled={loading || messages.length === 0}
+            aria-label="Clear chat"
+          >
+            <IconTrash size="1.1rem" />
           </ActionIcon>
         </Flex>
       </Container>
