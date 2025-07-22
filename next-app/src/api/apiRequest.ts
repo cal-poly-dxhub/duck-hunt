@@ -27,6 +27,7 @@ export async function apiRequest<T = unknown>(
     } = options;
 
     const teamId = localStorage.getItem("teamId");
+    const userId = localStorage.getItem("userId");
 
     let url = endpoint;
     Object.entries(params).forEach(([key, value]) => {
@@ -48,6 +49,10 @@ export async function apiRequest<T = unknown>(
 
     if (teamId) {
       headers["team-id"] = teamId;
+    }
+
+    if (userId) {
+      headers["user-id"] = userId;
     }
 
     const fetchOptions: RequestInit = {

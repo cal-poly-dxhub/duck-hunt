@@ -163,25 +163,25 @@ export default function Chat() {
     }
   }, [teamIdFromUrl, teamId, setTeamId, gameLoading, userId, setUserId]);
 
-  // useEffect(() => {
-  //   if (gameLoading) return;
-  //   if (teamIdFromUrl) return;
+  useEffect(() => {
+    if (gameLoading) return;
+    if (teamIdFromUrl) return;
 
-  //   if (!teamId) {
-  //     console.error(
-  //       "No teamId found in GameProvider. Please ensure you have set a team ID."
-  //     );
-  //     const message = {
-  //       id: 1,
-  //       text: "> Error: No team ID provided in URL or GameProvider.",
-  //       sender: "system" as const,
-  //       timestamp: new Date(),
-  //     };
+    if (!teamId) {
+      console.error(
+        "No teamId found in GameProvider. Please ensure you have set a team ID."
+      );
+      const message = {
+        id: 1,
+        text: "> Error: No team ID provided in URL or GameProvider.",
+        sender: "system" as const,
+        timestamp: new Date(),
+      };
 
-  //     setMessages([message]);
-  //     typeMessage(message.id, message.text);
-  //   }
-  // }, [teamId, teamIdFromUrl, gameLoading]);
+      setMessages([message]);
+      typeMessage(message.id, message.text);
+    }
+  }, [teamId, teamIdFromUrl, gameLoading]);
 
   /**
    *

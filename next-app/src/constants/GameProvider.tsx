@@ -54,6 +54,12 @@ const GameProvider = ({ children }: { children: ReactNode }) => {
       setTeamId(i);
     }
 
+    const u = localStorage.getItem("userId");
+    console.log("INFO: GameProvider - userId from localStorage:", u);
+    if (u) {
+      setUserId(u);
+    }
+
     setIsLoading(false);
   }, []);
 

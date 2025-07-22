@@ -59,12 +59,33 @@ pip install -r requirements.txt
 
 ```bash
 alembic init alembic
+```
+
+8. update `alembic.ini` to point to your database
+
+change the line in `alembic.ini`:
+
+```ini
+sqlalchemy.url = postgresql://your_username@localhost:5432/duck_hunt
+```
+
+9. update `alembic/env.py` to import your models
+
+```python
+# target_metadata = None # comment this line
+from models import Base  # import your models here
+target_metadata = Base.metadata
+```
+
+10. create the initial migration
+
+```bash
 alembic revision --autogenerate -m "initial migration"
 alembic upgrade head
 cd ..
 ```
 
-8. start the api
+11. start the api
 
 ```bash
 fastapi run main.py

@@ -8,7 +8,7 @@ from uuid import UUID
 from bedrock import invoke_llm
 from database import SessionLocal
 from dotenv import load_dotenv
-from models import Game, Level, Message, Team, TeamLevel
+from models import Game, Level, Message, Team, TeamLevel, User
 from pydantic import BaseModel
 
 from fastapi import Body, FastAPI, Form, Header, HTTPException
@@ -283,7 +283,6 @@ async def at_level(
     level_id: str,
     team_id: Annotated[Union[str, None], Header()] = None,
 ):
-
     if not team_id:
         raise HTTPException(status_code=401, detail="Invalid team id")
 
@@ -571,6 +570,13 @@ async def message(
         if not team:
             raise HTTPException(status_code=404, detail="Team not found")
 
+        # get or create user
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            user = User(id=UUID(user_id), team_id=team.id)
+            db.add(user)
+            db.commit()
+
         # get current team level
         team_level: TeamLevel = (
             db.query(TeamLevel)
@@ -596,7 +602,7 @@ async def message(
         )
 
         # if latest message is from assistant, user must wait for response
-        if level_messages and level_messages[-1].role == "user":  # type: ignore
+        if user_level_messages and user_level_messages[-1].role == "user":  # type: ignore
             raise HTTPException(
                 status_code=400,
                 detail="You must wait for the assistant's response before sending a new message.",
@@ -604,6 +610,7 @@ async def message(
 
         # user message
         user_message: Message = Message(
+            user_id=UUID(user_id),
             team_id=team.id,
             game_id=team.game_id,
             level_id=team_level.level_id,
@@ -652,6 +659,7 @@ async def message(
 
         # create assistant message
         assistant_message: Message = Message(
+            user_id=UUID(user_id),
             team_id=team.id,
             game_id=team.game_id,
             level_id=team_level.level_id,

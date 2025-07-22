@@ -84,7 +84,7 @@ class TeamLevel(Base, TimestampsMixin):
 
     # relationships
     team = relationship("Team", back_populates="team_levels")
-    level = relationship("Level")
+    level = relationship("Level", back_populates="team_levels")
 
     # repr str
     def __repr__(self):
