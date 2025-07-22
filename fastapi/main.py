@@ -58,6 +58,14 @@ class PingCoordinatesRequest(BaseModel):
     """
 
 
+class LevelData(BaseModel):
+    character: dict[str, Any]
+    location: dict[str, Any]
+    clues: list[str]
+    rules: list[str]
+    max_tokens: int = 512
+
+
 app = FastAPI()
 
 app.add_middleware(
@@ -272,18 +280,43 @@ def end_game(
     finally:
         db.close()
 
-    """
-    TODO: add a route to upload a json file for each level
-    save file to disk at ./levels/{game_id}/{level_id}.json
-    {
-    "id": UUID,
-    "locationName": string,
-    "locationInformation": string[],
-    "hints": string[],
-    "persona": string,
-    "systemPrompt": string
-    }
-    """
+
+@app.put("/api/level/{level_id}")
+def upload_level_data(
+    level_id: str,
+    level_data: LevelData,
+    api_key: Annotated[Union[str, None], Header()] = None,
+) -> JSONResponse:
+    if api_key != str(os.getenv("ADMIN_API_KEY")):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    db = SessionLocal()
+    try:
+        level: Level = db.query(Level).filter(Level.id == level_id).first()
+        if not level:
+            raise HTTPException(status_code=404, detail="Level not found")
+
+        game_id = level.game_id
+        level_dir = f"./games/{game_id}/levels"
+        os.makedirs(level_dir, exist_ok=True)
+
+        file_path = f"{level_dir}/{level_id}.json"
+        with open(file_path, "w") as f:
+            json.dump(level_data.model_dump(), f, indent=4)
+
+        return JSONResponse(
+            content={"message": f"Level data for level {level_id} uploaded successfully."},
+            media_type="application/json",
+        )
+    except Exception as e:
+        print(f"Error uploading level data: {str(e)}")
+        return JSONResponse(
+            content={"error": str(e)},
+            media_type="application/json",
+            status_code=500,
+        )
+    finally:
+        db.close()
 
 
 # TEAM ROUTES
@@ -678,13 +711,15 @@ def message(
         history.append({"role": "user", "content": request.prompt})
 
         # load level data and build system prompt
-        level_info = open(
+        with open(
             f"./games/{team.game_id}/levels/{team_level.level_id}.json", "r"
-        )
-        if not level_info:
-            raise HTTPException(status_code=404, detail="Level information not found.")
-        level_info_json: Dict[str, Union[str, List[str]]] = json.load(level_info)
-        system_prompt = build_system_prompt(level_info_json)
+        ) as level_info:
+            if not level_info:
+                raise HTTPException(
+                    status_code=404, detail="Level information not found."
+                )
+            level_info_json = json.load(level_info)
+            system_prompt = build_system_prompt(level_info_json)
 
         # call bedrock
         llm_response: str = invoke_llm(
@@ -692,7 +727,7 @@ def message(
                 {
                     "anthropic_version": "bedrock-2023-05-31",
                     "messages": history,
-                    "max_tokens": level_info_json.get("maxTokens", 512),
+                    "max_tokens": level_info_json.get("max_tokens", 512),
                     "system": system_prompt,
                 }
             )
