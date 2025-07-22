@@ -18,6 +18,11 @@ from fastapi.responses import JSONResponse
 
 load_dotenv()
 
+# Define base directories relative to this script's location
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+GAME_CONFIGS_DIR = os.path.join(SCRIPT_DIR, "game_configs")
+GAMES_DIR = os.path.join(SCRIPT_DIR, "games")
+
 
 class CreateGameRequest(BaseModel):
     name: str
@@ -62,7 +67,7 @@ class PingCoordinatesRequest(BaseModel):
 
 class LevelData(BaseModel):
     character: dict[str, Any]
-    location: dict[str, Union[str, float]]
+    location: dict[str, Any]  # Make it more flexible
     clues: dict[str, list[str]]
     max_tokens: int = 512
 
@@ -94,7 +99,7 @@ def create_game(
     try:
         game_config = None
         if request.config_file:
-            config_path = f"./fastapi/game_configs/{request.config_file}"
+            config_path = os.path.join(GAME_CONFIGS_DIR, request.config_file)
             if not os.path.exists(config_path):
                 raise HTTPException(status_code=404, detail=f"Config file not found: {request.config_file}")
             with open(config_path, "r") as f:
@@ -115,14 +120,20 @@ def create_game(
             Level(game_id=new_game.id) for _ in range(request.level_count)
         ]
         
+        # add levels to db and flush to get their IDs
+        for level in levels:
+            db.add(level)
+        db.flush()
+        
         if game_config:
             level_data_map = {}
             for i, (level_key, level_data) in enumerate(game_config.items()):
                 level_id = levels[i].id
+                print(f"Creating level file for level_id: {level_id}")
                 level_data_map[level_id] = level_data
-                level_dir = f"./fastapi/games/{new_game.id}/levels"
+                level_dir = os.path.join(GAMES_DIR, str(new_game.id), "levels")
                 os.makedirs(level_dir, exist_ok=True)
-                file_path = f"{level_dir}/{level_id}.json"
+                file_path = os.path.join(level_dir, f"{str(level_id)}.json")
                 with open(file_path, "w") as f:
                     json.dump(level_data, f, indent=4)
 
@@ -138,9 +149,7 @@ def create_game(
                 for i in range(request.team_count)
             ]
 
-        # add levels and teams to db
-        for level in levels:
-            db.add(level)
+        # add teams to db
         for team in teams:
             db.add(team)
 
@@ -217,8 +226,9 @@ def create_game(
         for team_level in team_levels:
             db.add(team_level)
 
-        os.makedirs(f"./fastapi/games/{new_game.id}/levels", exist_ok=True)
-        with open(f"./fastapi/games/{new_game.id}/game.json", "w") as gameFile:
+        game_dir = os.path.join(GAMES_DIR, str(new_game.id))
+        os.makedirs(os.path.join(game_dir, "levels"), exist_ok=True)
+        with open(os.path.join(game_dir, "game.json"), "w") as gameFile:
             game_info: dict[str, Any] = {
                 "id": new_game.id.__str__(),
                 "name": new_game.name,
@@ -317,10 +327,10 @@ def upload_level_data(
             raise HTTPException(status_code=404, detail="Level not found")
 
         game_id = level.game_id
-        level_dir = f"./fastapi/games/{game_id}/levels"
+        level_dir = os.path.join(GAMES_DIR, str(game_id), "levels")
         os.makedirs(level_dir, exist_ok=True)
 
-        file_path = f"{level_dir}/{level_id}.json"
+        file_path = os.path.join(level_dir, f"{level_id}.json")
         with open(file_path, "w") as f:
             json.dump(level_data.model_dump(), f, indent=4)
 
@@ -418,14 +428,13 @@ def at_level(
         if not current_team_level:
             raise HTTPException(status_code=400, detail="All levels completed")
 
-        # if no level_id provided, return current level
+        # if level_id is "current", return current level
         if level_id == "current":
             return JSONResponse(
                 content={
-                    # TODO: do not show the actual level id
                     "message": f"You are at level {current_team_level.level_id}.",
                     "level_id": str(current_team_level.level_id),
-                    "message_history": fetch_user_messages(user_id, team_id, level_id),
+                    "message_history": fetch_user_messages(user_id, team_id, str(current_team_level.level_id)),
                 },
                 media_type="application/json",
             )
@@ -523,7 +532,8 @@ def finish_game(
 
         # load game config to get end sequence
         try:
-            with open(f"./fastapi/games/{team.game_id}/config.json", "r") as config_file:
+            config_path = os.path.join(GAMES_DIR, str(team.game_id), "config.json")
+            with open(config_path, "r") as config_file:
                 config_data = json.load(config_file)
                 expected_end_sequence = config_data.get("endSequence")
         except FileNotFoundError:
@@ -746,9 +756,8 @@ def message(
         history.append({"role": "user", "content": request.prompt})
 
         # load level data and build system prompt
-        with open(
-            f"./fastapi/games/{team.game_id}/levels/{team_level.level_id}.json", "r"
-        ) as level_info:
+        level_file_path = os.path.join(GAMES_DIR, str(team.game_id), "levels", f"{team_level.level_id}.json")
+        with open(level_file_path, "r") as level_info:
             if not level_info:
                 raise HTTPException(
                     status_code=404, detail="Level information not found."

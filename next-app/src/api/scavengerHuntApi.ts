@@ -1,5 +1,12 @@
 import { apiPost } from "./apiRequest";
 
+interface AtLevelResponse {
+  success: boolean;
+  message: string;
+  level: string;
+  messageHistory: import("../constants/types").Message[];
+}
+
 const message = async (prompt: string) => {
   try {
     const response = await apiPost<{ message: string; response: string }>(
@@ -31,25 +38,38 @@ const message = async (prompt: string) => {
   }
 };
 
-const atLevel = async (levelId: string) => {
+const atLevel = async (
+  levelId: string
+): Promise<AtLevelResponse | { success: false; error: string }> => {
   try {
     const response = await apiPost<{
       message: string;
       level_id: string;
-      message_history: string[];
+      message_history: {
+        id: string;
+        text: string;
+        sender: "user" | "system";
+        timestamp: string;
+      }[];
     }>(`${process.env.NEXT_PUBLIC_API_BASE_URL}/at-level/${levelId}`);
 
     if (!response.success) {
       throw new Error(response.error || "Failed to get level");
     }
 
-    console.log(response.data);
+    const messageHistory = (response.data.message_history || []).map(
+      (msg, index) => ({
+        ...msg,
+        id: new Date(msg.timestamp).getTime() + index,
+        timestamp: new Date(msg.timestamp),
+      })
+    );
 
     return {
       success: true,
       message: response.data.message,
       level: response.data.level_id,
-      messageHistory: response.data.message_history,
+      messageHistory: messageHistory,
     };
   } catch (error) {
     console.error("Error in atLevel function:", error);
