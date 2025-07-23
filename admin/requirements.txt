@@ -2,4 +2,5 @@ streamlit==1.35.0
 pandas
 requests
 python-dotenv
-folium streamlit-folium
+folium 
+streamlit-folium
