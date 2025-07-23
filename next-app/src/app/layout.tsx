@@ -11,7 +11,7 @@ import { Suspense } from "react";
 
 export const metadata = {
   title: "DxHub Scavenger Hunt",
-  description: "im scavenger hunting it",
+  description: "find the ducks",
 };
 
 export default function RootLayout({
