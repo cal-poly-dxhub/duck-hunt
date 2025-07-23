@@ -8,15 +8,20 @@ from uuid import UUID
 from bedrock import invoke_llm
 from database import SessionLocal
 from dotenv import load_dotenv
-from models import CoordinateSnapshot, Game, Level, Message, Team, TeamLevel, User
+from models import Game, Level, Message, Team, TeamLevel, User, CoordinateSnapshot
 from pydantic import BaseModel
 
-from fastapi import Body, FastAPI, Form, Header, HTTPException
+from fastapi import Body, FastAPI, Form, Header, HTTPException, APIRouter, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import func, case, cast, Float
+from sqlalchemy.orm import Session
+from database import get_db
+
 
 load_dotenv()
 
+admin_router = APIRouter(tags=["admin"])
 
 class CreateGameRequest(BaseModel):
     name: str
@@ -285,6 +290,63 @@ def end_game(
     }
     """
 
+@admin_router.get("/teams")
+def list_teams(db: Session = Depends(get_db)):
+    teams = db.query(Team).filter(Team.deleted_at.is_(None)).all()
+    # ADD the name field ↓↓↓ (keep the function name & layout unchanged)
+    return [{"id": str(t.id), "name": t.name} for t in teams]
+
+@admin_router.get("/teams/{team_id}/users")
+def get_team_users(team_id: str, db: Session = Depends(get_db)):
+    users = db.query(User).filter(User.team_id == team_id, User.deleted_at.is_(None)).all()
+    return [{"id": str(u.id)} for u in users]
+
+@admin_router.get("/teams/{team_id}/progress")
+def get_team_progress(team_id: str, db: Session = Depends(get_db)):
+    result = (
+        db.query(
+            func.count(Level.id).label("total"),
+            func.sum(case((TeamLevel.completed_at.is_not(None), 1), else_=0)).label("done"),
+        )
+        .join(Level, TeamLevel.level_id == Level.id)
+        .filter(TeamLevel.team_id == team_id, Level.deleted_at.is_(None))
+        .one()
+    )
+    total = int(result.total or 0)
+    done = int(result.done or 0)
+    return {"done": done, "total": total}
+
+@admin_router.get("/teams/{team_id}/coords")
+def get_team_coords(team_id: str, db: Session = Depends(get_db)):
+    sub = (
+        db.query(
+            CoordinateSnapshot.user_id,
+            func.max(CoordinateSnapshot.created_at).label("latest_ts"),
+        )
+        .filter(CoordinateSnapshot.team_id == team_id)
+        .group_by(CoordinateSnapshot.user_id)
+        .subquery()
+    )
+    rows = (
+        db.query(
+            CoordinateSnapshot.user_id,
+            cast(CoordinateSnapshot.latitude, Float).label("lat"),
+            cast(CoordinateSnapshot.longitude, Float).label("lon"),
+        )
+        .join(
+            sub,
+            (CoordinateSnapshot.user_id == sub.c.user_id)
+            & (CoordinateSnapshot.created_at == sub.c.latest_ts),
+        )
+        .all()
+    )
+    return [
+        {"user_id": str(r.user_id), "lat": r.lat, "lon": r.lon}
+        for r in rows
+    ]
+
+# Assume you already have `app = FastAPI(...)`
+app.include_router(admin_router)
 
 # TEAM ROUTES
 
