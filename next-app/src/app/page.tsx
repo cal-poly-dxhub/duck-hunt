@@ -18,7 +18,7 @@ import "@mantine/core/styles.css";
 import { IconSend, IconTrash, IconUpload } from "@tabler/icons-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-// import Markdown from "react-markdown";
+import Markdown from "react-markdown";
 
 const blinkAnimation = `
   @keyframes blink {
@@ -430,8 +430,7 @@ export default function Chat() {
                       </span>
                     </span>
                   ) : (
-                    // <Markdown>{displayText}</Markdown>
-                    displayText
+                    <Markdown>{displayText}</Markdown>
                   )}
                   {message.sender === "system" && !isLoadingMessage && (
                     <Box
