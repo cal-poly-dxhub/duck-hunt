@@ -8,6 +8,8 @@ from uuid import UUID
 from bedrock import invoke_llm, verify_location_leak
 from database import SessionLocal
 from dotenv import load_dotenv
+from prompts import DIFFICULTY_PROMPTS, DIFFICULTY_MODEL_IDS
+
 from models import (
     CoordinateSnapshot,
     Game,
@@ -80,7 +82,7 @@ class PingCoordinatesRequest(BaseModel):
 
 class LevelData(BaseModel):
     character: dict[str, Any]
-    location: dict[str, Any]
+    location: dict[str, Any]  # Make it more flexible
     clues: dict[str, list[str]]
     max_tokens: int = 512
 
@@ -140,8 +142,11 @@ def create_game(
         db.flush()
         
         if game_config:
+            level_data_map = {}
             for i, (level_key, level_data) in enumerate(game_config.items()):
                 level_id = levels[i].id
+                print(f"Creating level file for level_id: {level_id}")
+                level_data_map[level_id] = level_data
                 level_dir = os.path.join(GAMES_DIR, str(new_game.id), "levels")
                 os.makedirs(level_dir, exist_ok=True)
                 file_path = os.path.join(level_dir, f"{str(level_id)}.json")
@@ -359,18 +364,43 @@ def end_game(
     finally:
         db.close()
 
-    """
-    TODO: add a route to upload a json file for each level
-    save file to disk at ./levels/{game_id}/{level_id}.json
-    {
-    "id": UUID,
-    "locationName": string,
-    "locationInformation": string[],
-    "hints": string[],
-    "persona": string,
-    "systemPrompt": string
-    }
-    """
+
+@app.put("/api/level/{level_id}")
+def upload_level_data(
+    level_id: str,
+    level_data: LevelData,
+    api_key: Annotated[Union[str, None], Header()] = None,
+) -> JSONResponse:
+    if api_key != str(os.getenv("ADMIN_API_KEY")):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    db = SessionLocal()
+    try:
+        level: Level = db.query(Level).filter(Level.id == level_id).first()
+        if not level:
+            raise HTTPException(status_code=404, detail="Level not found")
+
+        game_id = level.game_id
+        level_dir = os.path.join(GAMES_DIR, str(game_id), "levels")
+        os.makedirs(level_dir, exist_ok=True)
+
+        file_path = os.path.join(level_dir, f"{level_id}.json")
+        with open(file_path, "w") as f:
+            json.dump(level_data.model_dump(), f, indent=4)
+
+        return JSONResponse(
+            content={"message": f"Level data for level {level_id} uploaded successfully."},
+            media_type="application/json",
+        )
+    except Exception as e:
+        print(f"Error uploading level data: {str(e)}")
+        return JSONResponse(
+            content={"error": str(e)},
+            media_type="application/json",
+            status_code=500,
+        )
+    finally:
+        db.close()
 
 @admin_router.get("/teams")
 def list_teams(db: Session = Depends(get_db)):
@@ -509,16 +539,14 @@ def at_level(
         if not current_team_level:
             raise HTTPException(status_code=400, detail="All levels completed")
 
-        # if no level_id provided, return current level
+        # if level_id is "current", return current level
         if level_id == "current":
             return JSONResponse(
                 content={
-                    # TODO: do not show the actual level id
-                    "message": f"You are at level {current_team_level.id}.",
+
+                    "message": f"You are at level {current_team_level.level_id}.",
                     "level_id": str(current_team_level.level_id),
-                    "message_history": fetch_user_messages(
-                        user_id, team_id, current_team_level.level_id.__str__()
-                    ),
+                    "message_history": fetch_user_messages(user_id, team_id, str(current_team_level.level_id)),
                 },
                 media_type="application/json",
             )
@@ -872,7 +900,9 @@ def message(
         level_file_path = os.path.join(GAMES_DIR, str(team.game_id), "levels", f"{team_level.level_id}.json")
         with open(level_file_path, "r") as level_info:
             if not level_info:
-                raise HTTPException(status_code=404, detail="Level information not found.")
+                raise HTTPException(
+                    status_code=404, detail="Level information not found."
+                )
             level_info_json = json.load(level_info)
             system_prompt = build_system_prompt(level_info_json, team.difficulty_level)
 
@@ -882,7 +912,7 @@ def message(
 
         # call bedrock
         llm_response: str = invoke_llm(
-            body=json.dumps(
+            request_body=json.dumps(
                 {
                     "anthropic_version": "bedrock-2023-05-31",
                     "messages": history,
@@ -890,7 +920,7 @@ def message(
                     "system": system_prompt,
                 }
             ),
-            modelId=model_id,
+            model_id=model_id,
         )
 
         llm_response_body: Dict[str, Union[str, List[Dict[str, str]]]] = json.loads(

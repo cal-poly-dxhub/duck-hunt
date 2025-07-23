@@ -1,5 +1,5 @@
 fastapi
-# fastapi[standard]
+fastapi[standard]
 numpy
 boto3
 sqlalchemy
