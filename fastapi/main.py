@@ -2,12 +2,14 @@ import json
 import os
 import random
 from datetime import datetime
-from typing import Annotated, Any, Dict, List, Set, Union
+from typing import Annotated, Any, Dict, List, Set, Union, Optional
 from uuid import UUID
 
-from bedrock import invoke_llm
+from bedrock import invoke_llm, verify_location_leak
 from database import SessionLocal
 from dotenv import load_dotenv
+from prompts import DIFFICULTY_PROMPTS, DIFFICULTY_MODEL_IDS
+
 from models import (
     CoordinateSnapshot,
     Game,
@@ -30,14 +32,20 @@ from database import get_db
 
 load_dotenv()
 
+# Define base directories relative to this script's location
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+GAME_CONFIGS_DIR = os.path.join(SCRIPT_DIR, "game_configs")
+GAMES_DIR = os.path.join(SCRIPT_DIR, "games")
+
 admin_router = APIRouter(tags=["admin"])
 
 class CreateGameRequest(BaseModel):
     name: str
     description: str
-    level_count: int
     team_count: int
+    level_count: int = 0  # Now optional, will be derived from config if provided
     team_names: Annotated[Union[list[str], None], Form()] = None
+    config_file: Optional[str] = None
     # team_levels: Annotated[Union[list[int], None], Form()] = None
 
     """
@@ -72,6 +80,13 @@ class PingCoordinatesRequest(BaseModel):
     """
 
 
+class LevelData(BaseModel):
+    character: dict[str, Any]
+    location: dict[str, Any]  # Make it more flexible
+    clues: dict[str, list[str]]
+    max_tokens: int = 512
+
+
 app = FastAPI()
 
 app.add_middleware(
@@ -95,12 +110,20 @@ def create_game(
     if api_key != str(os.getenv("ADMIN_API_KEY")):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-    # all games need at least 2 levels (start and end)
-    if request.level_count < 2:
-        raise HTTPException(status_code=400, detail="Level count must be at least 2.")
-
     db = SessionLocal()
     try:
+        game_config = None
+        if request.config_file:
+            config_path = os.path.join(GAME_CONFIGS_DIR, request.config_file)
+            if not os.path.exists(config_path):
+                raise HTTPException(status_code=404, detail=f"Config file not found: {request.config_file}")
+            with open(config_path, "r") as f:
+                game_config = json.load(f)
+            request.level_count = len(game_config)
+
+        if request.level_count < 1:
+            raise HTTPException(status_code=400, detail="A game must have at least one level.")
+
         new_game = Game(
             name=request.name,
             description=request.description,
@@ -111,6 +134,23 @@ def create_game(
         levels: List[Level] = [
             Level(game_id=new_game.id) for _ in range(request.level_count)
         ]
+        
+        # add levels to db and flush to get their IDs
+        for level in levels:
+            db.add(level)
+        db.flush()
+        
+        if game_config:
+            level_data_map = {}
+            for i, (level_key, level_data) in enumerate(game_config.items()):
+                level_id = levels[i].id
+                print(f"Creating level file for level_id: {level_id}")
+                level_data_map[level_id] = level_data
+                level_dir = os.path.join(GAMES_DIR, str(new_game.id), "levels")
+                os.makedirs(level_dir, exist_ok=True)
+                file_path = os.path.join(level_dir, f"{str(level_id)}.json")
+                with open(file_path, "w") as f:
+                    json.dump(level_data, f, indent=4)
 
         # handle custom team names
         if request.team_names and len(request.team_names) == request.team_count:
@@ -124,9 +164,7 @@ def create_game(
                 for i in range(request.team_count)
             ]
 
-        # add levels and teams to db
-        for level in levels:
-            db.add(level)
+        # add teams to db
         for team in teams:
             db.add(team)
 
@@ -203,8 +241,9 @@ def create_game(
         for team_level in team_levels:
             db.add(team_level)
 
-        os.makedirs(f"./games/{new_game.id}/levels")
-        with open(f"./games/{new_game.id}/game.json", "w") as gameFile:
+        game_dir = os.path.join(GAMES_DIR, str(new_game.id))
+        os.makedirs(os.path.join(game_dir, "levels"), exist_ok=True)
+        with open(os.path.join(game_dir, "game.json"), "w") as gameFile:
             game_info: dict[str, Any] = {
                 "id": new_game.id.__str__(),
                 "name": new_game.name,
@@ -286,18 +325,43 @@ def end_game(
     finally:
         db.close()
 
-    """
-    TODO: add a route to upload a json file for each level
-    save file to disk at ./levels/{game_id}/{level_id}.json
-    {
-    "id": UUID,
-    "locationName": string,
-    "locationInformation": string[],
-    "hints": string[],
-    "persona": string,
-    "systemPrompt": string
-    }
-    """
+
+@app.put("/api/level/{level_id}")
+def upload_level_data(
+    level_id: str,
+    level_data: LevelData,
+    api_key: Annotated[Union[str, None], Header()] = None,
+) -> JSONResponse:
+    if api_key != str(os.getenv("ADMIN_API_KEY")):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    db = SessionLocal()
+    try:
+        level: Level = db.query(Level).filter(Level.id == level_id).first()
+        if not level:
+            raise HTTPException(status_code=404, detail="Level not found")
+
+        game_id = level.game_id
+        level_dir = os.path.join(GAMES_DIR, str(game_id), "levels")
+        os.makedirs(level_dir, exist_ok=True)
+
+        file_path = os.path.join(level_dir, f"{level_id}.json")
+        with open(file_path, "w") as f:
+            json.dump(level_data.model_dump(), f, indent=4)
+
+        return JSONResponse(
+            content={"message": f"Level data for level {level_id} uploaded successfully."},
+            media_type="application/json",
+        )
+    except Exception as e:
+        print(f"Error uploading level data: {str(e)}")
+        return JSONResponse(
+            content={"error": str(e)},
+            media_type="application/json",
+            status_code=500,
+        )
+    finally:
+        db.close()
 
 @admin_router.get("/teams")
 def list_teams(db: Session = Depends(get_db)):
@@ -436,16 +500,14 @@ def at_level(
         if not current_team_level:
             raise HTTPException(status_code=400, detail="All levels completed")
 
-        # if no level_id provided, return current level
+        # if level_id is "current", return current level
         if level_id == "current":
             return JSONResponse(
                 content={
-                    # TODO: do not show the actual level id
-                    "message": f"You are at level {current_team_level.id}.",
+
+                    "message": f"You are at level {current_team_level.level_id}.",
                     "level_id": str(current_team_level.level_id),
-                    "message_history": fetch_user_messages(
-                        user_id, team_id, current_team_level.level_id.__str__()
-                    ),
+                    "message_history": fetch_user_messages(user_id, team_id, str(current_team_level.level_id)),
                 },
                 media_type="application/json",
             )
@@ -543,7 +605,8 @@ def finish_game(
 
         # load game config to get end sequence
         try:
-            with open(f"./games/{team.game_id}/config.json", "r") as config_file:
+            config_path = os.path.join(GAMES_DIR, str(team.game_id), "config.json")
+            with open(config_path, "r") as config_file:
                 config_data = json.load(config_file)
                 expected_end_sequence = config_data.get("endSequence")
         except FileNotFoundError:
@@ -630,38 +693,53 @@ def finish_game(
         db.close()
 
 
-def build_system_prompt(level_data: dict[str, Any]) -> str:
-    """Build system prompt from structured level data"""
-    character = level_data["character"]
-    location = level_data["location"]
-    clues = level_data["clues"]
-    rules = level_data["rules"]
+def build_system_prompt(level_data: dict[str, Any], difficulty_level: int) -> str:
+    """Build system prompt from structured level data and difficulty level."""
+    
+    # Select difficulty prompt, defaulting to the highest level if out of bounds
+    max_difficulty = max(DIFFICULTY_PROMPTS.keys())
+    difficulty = min(difficulty_level, max_difficulty)
+    difficulty_prompt_data = DIFFICULTY_PROMPTS.get(difficulty, DIFFICULTY_PROMPTS[max_difficulty])
+    difficulty_instructions = difficulty_prompt_data["system_prompt"]
 
-    catchphrases_text = ", ".join(
-        [f"'{phrase}'" for phrase in character["catchphrases"]]
-    )
-    traits_text = "\n".join([f"- {trait}" for trait in character["traits"]])
-    location_details = " ".join(location["details"])
-    clues_text = "\n".join([f"• {clue}" for clue in clues])
-    rules_text = "\n".join([f"- {rule}" for rule in rules])
-    system_prompt = f"""You are {character["name"]}! {character["personality"]}
+    # Extract persona and level-specific details
+    character = level_data.get("character", {})
+    location = level_data.get("location", {})
+    clues_by_difficulty = level_data.get("clues", {})
+    
+    # Select the appropriate set of clues based on difficulty
+    difficulty_str = str(difficulty)
+    if difficulty_str in clues_by_difficulty:
+        selected_clues = clues_by_difficulty[difficulty_str]
+    else:
+        # Default to the hardest available clues if the current difficulty is not explicitly defined
+        highest_defined_difficulty = max(clues_by_difficulty.keys(), key=int) if clues_by_difficulty else "0"
+        selected_clues = clues_by_difficulty.get(highest_defined_difficulty, [])
 
-You're helping students find a specific location - {location["description"]}. {location_details}
+    character_name = character.get("name", "A mysterious guide")
+    character_personality = character.get("personality", "")
+    location_description = location.get("description", "a secret place")
 
-CHARACTER TRAITS:
-{traits_text}
+    # Format persona details into text blocks
+    clues_text = "You have the following clues to guide them:\n" + "\n".join([f"• {clue}" for clue in selected_clues]) if selected_clues else "You have no clues to give for this location."
 
-USE THESE CATCHPHRASES: {catchphrases_text}
+    # Combine all parts into the final system prompt
+    system_prompt = f"""
+{difficulty_instructions}
 
-AVAILABLE CLUES TO GIVE:
+Here is the context for the current level:
+
+Your Persona:
+You are {character_name}.
+{character_personality}
+
+The Secret Location:
+You are guiding players to '{location_description}'.
+
+Available Clues:
 {clues_text}
-
-RULES:
-{rules_text}
-
-Help them discover this location through conversation while staying in character!"""
-
-    return system_prompt
+"""
+    return system_prompt.strip()
 
 
 # route for a team sending a message to llm
@@ -781,24 +859,30 @@ def message(
         history.append({"role": "user", "content": request.prompt})
 
         # load level data and build system prompt
-        level_info = open(
-            f"./games/{team.game_id}/levels/{team_level.level_id}.json", "r"
-        )
-        if not level_info:
-            raise HTTPException(status_code=404, detail="Level information not found.")
-        level_info_json: Dict[str, Union[str, List[str]]] = json.load(level_info)
-        system_prompt = build_system_prompt(level_info_json)
+        level_file_path = os.path.join(GAMES_DIR, str(team.game_id), "levels", f"{team_level.level_id}.json")
+        with open(level_file_path, "r") as level_info:
+            if not level_info:
+                raise HTTPException(
+                    status_code=404, detail="Level information not found."
+                )
+            level_info_json = json.load(level_info)
+            system_prompt = build_system_prompt(level_info_json, team.difficulty_level)
+
+        # Select model based on difficulty
+        max_difficulty_model = max(DIFFICULTY_MODEL_IDS.keys())
+        model_id = DIFFICULTY_MODEL_IDS.get(team.difficulty_level, DIFFICULTY_MODEL_IDS[max_difficulty_model])
 
         # call bedrock
         llm_response: str = invoke_llm(
-            json.dumps(
+            request_body=json.dumps(
                 {
                     "anthropic_version": "bedrock-2023-05-31",
                     "messages": history,
-                    "max_tokens": level_info_json.get("maxTokens", 512),
+                    "max_tokens": level_info_json.get("max_tokens", 512),
                     "system": system_prompt,
                 }
-            )
+            ),
+            model_id=model_id,
         )
 
         llm_response_body: Dict[str, Union[str, List[Dict[str, str]]]] = json.loads(
@@ -810,6 +894,13 @@ def message(
             raise HTTPException(
                 status_code=500, detail="Failed to get response from LLM."
             )
+        
+        # Verify if the location was leaked
+        location_name = level_info_json.get("location", {}).get("description", "")
+        if location_name and verify_location_leak(llm_response_text, location_name):
+            team.difficulty_level += 1
+            db.add(team)
+            print(f"Team {team.id} difficulty increased to {team.difficulty_level}")
 
         # create assistant message
         assistant_message: Message = Message(

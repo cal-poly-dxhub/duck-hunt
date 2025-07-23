@@ -235,7 +235,7 @@ export default function Chat() {
         );
 
         if (!data.success) {
-          throw new Error(data.error || "Unknown error");
+          throw new Error("Unknown error");
         }
 
         const systemMessage: Message = {
