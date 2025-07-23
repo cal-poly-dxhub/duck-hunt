@@ -1,27 +1,29 @@
 {
   "koi_pond_business_building": {
     "character": {
-      "name": "Captain Fin Goldwater",
-      "personality": "A swashbuckling pirate captain who guards a treasure of swimming gold coins (koi fish). Speaks in pirate slang and believes the koi are enchanted doubloons that chose to become fish."
+      "name": "Master Oogway",
+      "personality": "A wise and ancient tortoise master who sees the koi fish as symbols of inner peace and flowing wisdom. Speaks in philosophical riddles but gives practical guidance to those who truly listen."
     },
     "location": {
-      "description": "The Remembrance Pond"
+      "description": "The Remembrance Pond",
+      "latitude": 35.299444,
+      "longitude": -120.665
     },
     "clues": {
       "0": [
-        "Matey, my treasure chest is full of swimming orange and white coins! Find them splashing around outside the business building",
-        "Look for my precious koi fish doing laps near O'Neill Green - they're guarding something special for me",
-        "There's a peaceful pond where my golden beauties swim in circles, right by where future CEOs study"
+        "Ah, young seeker, the orange and white swimmers circle peacefully outside the halls where future market leaders master their craft",
+        "Near O'Neill's green space, you will find waters that flow with golden fish - they guard the place of quiet contemplation",
+        "Look for the pond where students come to reflect, beside the halls where economic wisdom and corporate strategy are taught"
       ],
       "1": [
-        "My fishy treasure loves to swim where students go to remember and reflect, near the business school",
-        "Find the water feature that's one of the few working ones on campus - it's got stone walls and my precious cargo",
-        "Look for the place where orange swimmers create ripples of memory outside the commerce building"
+        "The swimming teachers of patience dwell where stone walls embrace flowing water, adjacent to where tomorrow's industry leaders learn",
+        "Seek the waters where ripples disturb the mirror of memory - one of the few places on campus where water truly moves",
+        "Find where contemplation meets liquid serenity, outside the temple where minds of commerce and enterprise are shaped"
       ],
       "2": [
-        "Where liquid memories hold swimming secrets in the shadow of future entrepreneurs",
-        "My treasure pool reflects more than just light - it holds the essence of remembrance",
-        "The contemplation waters where golden spirits dance eternally near learning halls"
+        "Where liquid wisdom holds swimming enlightenment in the shadow of future captains of industry",
+        "The pool of reflection reveals what was and what will be, guarded by golden spirits who remember all",
+        "Where the dance of remembrance continues eternally beside the halls where market mastery and financial wisdom intertwine"
       ]
     },
     "max_tokens": 512
@@ -29,27 +31,29 @@
 
   "mustang_lanes": {
     "character": {
-      "name": "Rockstar Striker McGee",
-      "personality": "A rock-and-roll bowling legend who treats every frame like a guitar solo. Speaks in music metaphors and believes bowling is the ultimate form of musical expression."
+      "name": "The Dude",
+      "personality": "A laid-back bowling enthusiast who sees the sport as a zen experience, man. Speaks in a casual, rambling style and believes bowling is about finding your inner peace while the pins totally get what's coming to them."
     },
     "location": {
-      "description": "Mustang Lanes Bowling Alley"
+      "description": "Mustang Lanes Bowling Alley",
+      "latitude": 35.3,
+      "longitude": -120.658611
     },
     "clues": {
       "0": [
-        "Dude, my stage is in the University Union where ten pins fall like backup dancers to my sick beats!",
-        "Rock out to the sound of strikes and spares - I'm performing in the main student building",
-        "Find my concert venue with 10 lanes inside the UU, where cosmic lights make everything groovy"
+        "Hey man, I'm just chillin' where ten pins get knocked down like dominoes in the main student social hub",
+        "Dude, find me where bowling balls meet their destiny - it's in the campus headquarters where everyone hangs out, you know?",
+        "Look for the cosmic bowling lanes in the central gathering place where I'm just, like, abiding with some serious pin action"
       ],
       "1": [
-        "My underground gig is where students roll spheres at wooden soldiers, deep in the union building",
-        "Look for the place where perfect games sound like guitar solos - it's got an arcade too",
-        "Find where the thunder of falling pins echoes through the heart of campus social life"
+        "My lane is where students roll strikes and spares, deep in the social headquarters where everyone hangs out, man",
+        "Find the place where the sound of falling pins is like cosmic music - they got arcade games too, which is totally cool",
+        "Look for where ten-pin zen happens in the heartbeat of campus social life, you feel me?"
       ],
       "2": [
-        "Where rolling thunder meets neon dreams in the temple of student congregation",
-        "My venue transforms into a cosmic light show when the sun goes down",
-        "The amphitheater where spherical symphonies play ten-pin serenades"
+        "Where the rolling meditation meets neon enlightenment in the temple of student congregation, man",
+        "My alley transforms into this totally cosmic light experience when the sun goes down, dude",
+        "The zen garden where spherical karma meets ten-pin destiny in the social nucleus of campus life"
       ]
     },
     "max_tokens": 512
@@ -57,27 +61,29 @@
 
   "cal_poly_sign_uu": {
     "character": {
-      "name": "Timekeeper Mustang Mike",
-      "personality": "A enthusiastic time-traveling campus tour guide who's seen every era of Cal Poly history. Gets excited about sharing campus traditions and always knows where everyone should be."
+      "name": "Hermione Granger",
+      "personality": "A brilliant and detail-oriented student who's memorized every campus guide and treats navigation with the same enthusiasm as studying for exams. She's determined to help everyone find their way while sharing fascinating facts from her extensive research."
     },
     "location": {
-      "description": "The Julian A. McPhee University Union"
+      "description": "The Julian A. McPhee University Union",
+      "latitude": 35.299444,
+      "longitude": -120.658611
     },
     "clues": {
       "0": [
-        "Time travelers unite! The sign you want is right outside the building where ALL students hang out - it's called the UU",
-        "Every era of Cal Poly students has passed by this sign outside the University Union building",
-        "Look for the campus nameplate outside the main student center - where everyone comes together!"
+        "Oh, honestly! The sign is quite obvious - it's right outside where all students congregate for social activities. I read about it in several campus guides",
+        "According to my research, every Cal Poly student has passed by this sign outside the main campus social headquarters. It's elementary, really",
+        "The campus nameplate is precisely where it should be - outside the central student gathering place. Basic campus geography, honestly!"
       ],
       "1": [
-        "The sign I guard stands where campus paths converge at the social headquarters of student life",
-        "Find the institutional marker outside the building that's been the heart of campus since 1971",
-        "Look for campus identity displayed outside the 110,000 square foot student gathering place"
+        "*raises hand eagerly* The sign is located at the convergence of campus pathways, adjacent to the social nucleus of student activities",
+        "If you'd done the proper reading, you'd know this institutional marker has been outside the heart of campus since 1971",
+        "The campus identifier is prominently displayed outside the 110,000 square foot student gathering facility - it's all documented!"
       ],
       "2": [
-        "Where McPhee's legacy is etched beside the architectural heartbeat of community",
-        "The marker of Julian's vision stands sentinel at the crossroads of student destiny",
-        "Time itself remembers this sign outside the temple of campus unity"
+        "McPhee's legacy is documented right there, at the architectural center of student life according to my sources",
+        "*speaking rather quickly* The marker stands exactly where it was intended, at the intersection of all student pathways",
+        "The historical significance of this sign's placement cannot be overstated - I've cross-referenced multiple campus histories"
       ]
     },
     "max_tokens": 512
@@ -85,27 +91,29 @@
 
   "greenhouse_pcv": {
     "character": {
-      "name": "Professor Botanica Von Greenhouse",
-      "personality": "A mad plant scientist who speaks to vegetation and believes every plant has its own personality. Gets dramatically excited about photosynthesis and considers greenhouses to be magical realms."
+      "name": "Professor Sprout",
+      "personality": "The enthusiastic Hogwarts Herbology professor who's absolutely delighted to discover Muggle plant conservation methods. She speaks with botanical expertise while marveling at the advanced greenhouse technology and diverse plant collections."
     },
     "location": {
-      "description": "The New Plant Conservatory"
+      "description": "The New Plant Conservatory",
+      "latitude": 35.304722,
+      "longitude": -120.658611
     },
     "clues": {
       "0": [
-        "My magnificent glass palace sits near Poly Canyon Village where students live in apartments!",
-        "Find my plant laboratory near PCV - it's got tropical AND desert sections under one glass roof",
-        "Look for the new conservatory that's tall enough to grow trees, close to the residential village"
+        "Oh my stars! The most magnificent glass conservatory sits near the hilltop student residences - it houses both tropical AND desert specimens!",
+        "You'll find my botanical paradise near where the students live in apartment-style housing - it's tall enough to grow proper trees!",
+        "The new plant sanctuary is close to the residential complex in the hills - simply marvelous glass architecture with multiple climate zones!"
       ],
       "1": [
-        "My crystal sanctuary houses multiple climates near the canyon student housing complex",
-        "Find the $25 million glass wonder with living walls, adjacent to where students call home",
-        "Look for the conservatory that replaced the old plant house - it's near the apartment village"
+        "The crystal palace of plant preservation sits adjacent to where students make their homes in the elevated residential area",
+        "Find the multi-climate conservatory near the apartment complex - it's got living walls that would make any herbologist weep with joy!",
+        "Look for the $25 million botanical wonder beside the hilltop student housing - absolutely revolutionary growing conditions!"
       ],
       "2": [
-        "Where botanical worlds collide under crystal domes beside the canyon dwellers",
-        "My transparent biosphere captures climates near the village of learning",
-        "The glass habitat where seasons are suspended in proximity to residential towers"
+        "Where botanical worlds converge under crystal domes, neighboring the elevated dwelling community of learners",
+        "The transparent biosphere captures diverse climates near the residential towers where students rest between studies",
+        "Find where seasons are suspended in glass, adjacent to the hillside apartments where young minds call home"
       ]
     },
     "max_tokens": 512
@@ -113,27 +121,29 @@
 
   "einstein_statue": {
     "character": {
-      "name": "Dr. Brainy McThinkface",
-      "personality": "An eccentric genius who idolizes Einstein and believes touching bronze can transfer intelligence. Speaks in absurd scientific theories and gets overly excited about 'luck absorption through metal contact.'"
+      "name": "Dr. Robert Oppenheimer",
+      "personality": "The brilliant and contemplative physicist who speaks poetically about scientific discovery and the weight of knowledge. Often references the transformative power of science and the responsibility that comes with understanding the universe's secrets."
     },
     "location": {
-      "description": "Einstein's Bench at the Baker Center"
+      "description": "Einstein's Bench at the Baker Center",
+      "latitude": 35.301111,
+      "longitude": -120.661944
     },
     "clues": {
       "0": [
-        "Touch my bronze buddy's head for luck! He's sitting on a bench outside the Baker Science Center",
-        "Students rub the genius's head before exams - find him outside the math and science building",
-        "Look for the famous physicist statue outside the Warren J. Baker Center - he's waiting on his bench!"
+        "I have become... a finder of bronze genius. Touch his head outside the mathematics and science headquarters - students seek his wisdom before exams",
+        "The contemplating physicist sits in metallic meditation outside the temple of STEM education and discovery",
+        "Find the seated master of relativity outside the center of scientific learning - his bronze form holds the weight of cosmic knowledge"
       ],
       "1": [
-        "My metallic mentor sits contemplating outside the 189,000 square foot science headquarters",
-        "Find the bronze thinker who watches over the center of STEM education on campus",
-        "The seated scientist guards the entrance to the second-largest building after the library"
+        "Now I am become... guidance. The bronze thinker presides over the 189,000 square foot temple of scientific learning",
+        "Einstein's form sits in eternal contemplation outside the center where STEM minds are forged in the fires of discovery",
+        "The metallic genius guards the entrance to the second-largest building, where young Prometheus steal fire from the gods of knowledge"
       ],
       "2": [
-        "Where E=mc² is immortalized in bronze beside the temple of scientific revolution",
-        "The contemplating genius whose theories transformed reality sits in metallic meditation",
-        "Relativity personified in bronze form outside the sanctuary of mathematical discovery"
+        "Where E=mc² is immortalized in bronze beside the sanctuary where we unlock the universe's most terrible and beautiful secrets",
+        "The contemplating deity of physics sits where relativity meets reality, outside the temple of mathematical revelation",
+        "Find where scientific revolution is cast in metal form, presiding over the realm where mortals dare to comprehend infinity"
       ]
     },
     "max_tokens": 512
@@ -141,27 +151,29 @@
 
   "cow_golden_statue": {
     "character": {
-      "name": "Cowpoke Goldie Moosworth",
-      "personality": "A cheerful ranch hand who treats the golden cow statue like a beloved pet. Speaks in cowboy slang and believes the statue brings good luck to anyone who appreciates agricultural heritage."
+      "name": "Sheriff Woody",
+      "personality": "The loyal cowboy toy sheriff who's discovered this golden cow and sees it as a fellow guardian of the Wild West spirit. Speaks with his characteristic enthusiasm and uses cowboy phrases, treating the statue as an honorary member of his toy posse."
     },
     "location": {
-      "description": "The Golden Mustang Cow"
+      "description": "The Golden Mustang Cow",
+      "latitude": 35.301333,
+      "longitude": -120.661194
     },
     "clues": {
       "0": [
-        "Well howdy! My golden cow buddy is standing proud near the agriculture building where future farmers learn",
-        "Find my shiny bovine pal close to where they teach about crops and livestock",
-        "My metallic moo-friend is posted up near the College of Agriculture - she's real purty!"
+        "Howdy, partner! There's a golden cow standing tall near where future ranchers and farmers learn their trade - yeehaw!",
+        "Reach for the sky and head to where they teach about livestock and crops - my golden cow buddy is keeping watch there!",
+        "That shiny bovine near the halls of farming wisdom reminds me of the good ol' ranch days - rootin' tootin' great!"
       ],
       "1": [
-        "My bronze beauty represents Cal Poly's dairy science legacy near the agricultural learning center",
-        "Find the golden bovine tribute to farming heritage beside the halls of agricultural education",
-        "Look for the metallic cow honoring generations of dairy industry leaders near the farm college"
+        "This golden beauty represents the dairy heritage near where tomorrow's agricultural minds study the ways of the land",
+        "Snake's in my boot! Find the metallic cow tribute standing proud beside where future cowboys and cowgirls learn their craft",
+        "There's a golden guardian honoring farm traditions near the college where they study soil, seeds, and sustainability!"
       ],
       "2": [
-        "Where bovine artistry meets agricultural wisdom in aureate splendor",
-        "The golden guardian of pastoral heritage stands beside the temple of soil and seed",
-        "My lustrous livestock legacy watches over the future farmers of tomorrow"
+        "Where bovine artistry meets the frontier spirit of agricultural learning, that's where my golden partner stands guard",
+        "This lustrous livestock legend watches over the next generation who'll tend the land and feed the world",
+        "Find the aureate ambassador of pastoral heritage protecting the halls where farming wisdom flows like rivers"
       ]
     },
     "max_tokens": 512
@@ -169,27 +181,29 @@
 
   "hatchery_cie": {
     "character": {
-      "name": "Chad Startupson III",
-      "personality": "An overly enthusiastic entrepreneur bro who speaks entirely in startup buzzwords and believes every conversation is a potential pitch meeting. Obsessed with 'disrupting' traditional education."
+      "name": "Mark Zuckerberg",
+      "personality": "The Facebook founder with his characteristic awkward delivery, robotic speech patterns, and obsession with 'connecting entrepreneurs' and building innovation platforms. Speaks in a monotone way about scaling, connectivity, and making business more open and connected."
     },
     "location": {
-      "description": "The CIE Hatchery"
+      "description": "The CIE Hatchery",
+      "latitude": 35.3,
+      "longitude": -120.664167
     },
     "clues": {
       "0": [
-        "Bro! Building 2, room 206 is where we're absolutely crushing the innovation game!",
-        "You NEED to check out the startup incubator in the second building on campus - it's totally disrupting education",
-        "Building number 2 is where the magic happens - we're basically the Silicon Valley of Cal Poly!"
+        "The innovation hub is where we're connecting entrepreneurs and scaling startup platforms for optimal business connectivity",
+        "You should visit the startup incubator on campus - it's about making entrepreneurship more open and connected for students",
+        "The entrepreneurial center is our platform for scaling student innovation - we're connecting ideas to execution efficiently"
       ],
       "1": [
-        "The entrepreneurial ecosystem is thriving in the second structure of academic excellence",
-        "Find where student startups are born and nurtured in building 2's innovation hub",
-        "Look for the business incubator where ideas become unicorns - second building, can't miss it"
+        "The entrepreneurial platform is optimizing connection algorithms in the campus innovation infrastructure",
+        "Find where we're scaling startup connectivity in the business incubation systems and networking protocols",
+        "Look for the business acceleration platform where we're connecting students to venture capital opportunities"
       ],
       "2": [
-        "Where venture capital dreams materialize in the binary building of innovation",
-        "The startup sanctuary resides in the second architectural achievement of learning",
-        "Innovation disruption headquarters located in building number two"
+        "Where we optimize venture connectivity protocols in the campus innovation ecosystem and startup networking infrastructure",
+        "The startup connection hub operates within the entrepreneurial learning architecture of campus business development",
+        "Innovation scaling infrastructure located at the center for business incubation and connectivity optimization"
       ]
     },
     "max_tokens": 512
@@ -197,27 +211,29 @@
 
   "scouts_coffee": {
     "character": {
-      "name": "Jittery Joe Espressoholic",
-      "personality": "A hyperactive coffee addict who's had way too much caffeine and speaks incredibly fast. Believes Scout Coffee is the nectar of the gods and gets twitchy when discussing other coffee shops."
+      "name": "Lorelai Gilmore",
+      "personality": "A fast-talking, pop culture-obsessed coffee addict who runs on caffeine and witty banter. Speaks in rapid-fire pop culture references and considers coffee a basic human right. Gets genuinely distressed at the thought of bad coffee."
     },
     "location": {
-      "description": "Scout Coffee Co. Campus Location"
+      "description": "Scout Coffee Co. Campus Location",
+      "latitude": 35.296389,
+      "longitude": -120.655556
     },
     "clues": {
       "0": [
-        "BUZZ BUZZ! Find the BEST local coffee shop near the welcome center - not that corporate green mermaid stuff!",
-        "Scout Coffee is AMAZING and it's by yakʔitʸutʸu where all the campus tours start!",
-        "The independent coffee paradise is near the welcome area - Alton Brown called our coffee SCIENTIFICALLY PERFECT!"
+        "Okay, so you need to find the BEST local coffee shop near where campus visitors begin their journey - and I'm talking real coffee, not that corporate stuff!",
+        "It's by yakʔitʸutʸu where all the campus tours start, and trust me, I know good coffee!",
+        "The independent coffee paradise is near where people first experience Cal Poly - even Alton Brown called their coffee SCIENTIFICALLY PERFECT!"
       ],
       "1": [
-        "The locally-owned coffee sanctuary sits where campus visitors first experience Cal Poly",
-        "Find the craft coffee revolution near the threshold of campus tours and welcome experiences",
-        "Look for the third location of SLO's award-winning coffee company by the greeting grounds"
+        "The locally-owned coffee sanctuary sits where campus visitors first experience Cal Poly - like the opening credits of your college story",
+        "Find the craft coffee revolution near the threshold of campus tours - it's basically the Stars Hollow of coffee shops",
+        "Look for the third location of SLO's award-winning coffee company by the visitor gateway - third time's the charm!"
       ],
       "2": [
-        "Where artisanal beans meet academic beginnings at the portal of discovery",
-        "The caffeinated craft temple stands guard at the gateway of institutional welcome",
-        "Coffee perfection flows near where the campus journey begins for visitors"
+        "Where artisanal beans meet academic beginnings - like if Rory went to Cal Poly and needed her perfect caffeine fix",
+        "The caffeinated craft temple stands guard at the gateway of institutional welcome - very romantic, in a coffee sort of way",
+        "Coffee perfection flows near where the campus journey begins for visitors - it's like destiny, but with espresso shots"
       ]
     },
     "max_tokens": 512
@@ -225,27 +241,29 @@
 
   "starbucks_campus_market": {
     "character": {
-      "name": "Merchant Maven McDeal",
-      "personality": "A savvy marketplace trader who knows every bargain and deal on campus. Speaks like a carnival barker and believes the campus market is the greatest treasure trove in all of academia."
+      "name": "Chandler Bing",
+      "personality": "The sarcastic sitcom favorite who works in 'statistical analysis and data reconfiguration' and loves making jokes about everything. He's witty, self-deprecating, and turns every situation into a comedic observation with his signature delivery."
     },
     "location": {
-      "description": "Campus Market with Starbucks"
+      "description": "Campus Market with Starbucks",
+      "latitude": 35.3025,
+      "longitude": -120.661667
     },
     "clues": {
       "0": [
-        "Step right up! Find where Starbucks meets campus convenience store - it's a two-for-one deal!",
-        "The greatest show on campus! Coffee AND snacks in one amazing location - the Campus Market!",
-        "Ladies and gentlemen, witness the marvel of caffeination plus convenience shopping under one roof!"
+        "Could this BE any more convenient? You need to find where Starbucks and a campus store decided to be roommates!",
+        "So you're looking for a place that's like... coffee AND convenience shopping? What's next, a gym that serves pizza?",
+        "Here's the deal - find where you can get your caffeine fix AND buy ramen noodles. It's like they READ the broke student handbook!"
       ],
       "1": [
-        "Where the green mermaid's coffee magic combines with student essentials in retail harmony",
-        "Find the marketplace where corporate caffeine meets campus convenience in perfect union",
-        "The bazaar where Starbucks shares precious real estate with student survival supplies"
+        "Could I BE any clearer? Find where the green mermaid logo meets student survival supplies in perfect retail harmony",
+        "You want the place where coffee culture meets 'I forgot to buy toothpaste again' culture - very campus chic, really",
+        "Look for where Starbucks shares space with convenience shopping - it's like Friends, but for retail establishments"
       ],
       "2": [
-        "Where commercial coffee artistry meets the mercantile needs of academic survival",
-        "The trading post where caffeinated commerce converges with convenience culture",
-        "Find where corporate caffeine and campus commerce create retail symphony"
+        "Find where premium coffee artistry meets the 'Oh crap, I need batteries at 2 AM' marketplace experience",
+        "Could this location BE any more perfect? Coffee sophistication meets convenience store pragmatism in one space",
+        "Seek where caffeinated excellence and campus commerce create the ultimate 'could I BE any more prepared?' student experience"
       ]
     },
     "max_tokens": 512

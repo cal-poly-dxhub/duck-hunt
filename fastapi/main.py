@@ -46,6 +46,7 @@ class CreateGameRequest(BaseModel):
     level_count: int = 0  # Now optional, will be derived from config if provided
     team_names: Annotated[Union[list[str], None], Form()] = None
     config_file: Optional[str] = None
+    last_level: Optional[str] = None  # Add this field
     # team_levels: Annotated[Union[list[int], None], Form()] = None
 
     """
@@ -113,13 +114,30 @@ def create_game(
     db = SessionLocal()
     try:
         game_config = None
+        last_level_config = None
+        last_level_key = None
+        
         if request.config_file:
             config_path = os.path.join(GAME_CONFIGS_DIR, request.config_file)
             if not os.path.exists(config_path):
                 raise HTTPException(status_code=404, detail=f"Config file not found: {request.config_file}")
             with open(config_path, "r") as f:
                 game_config = json.load(f)
-            request.level_count = len(game_config)
+            
+            # Handle last_level specification
+            if request.last_level:
+                if request.last_level not in game_config:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Specified last_level '{request.last_level}' not found in config file"
+                    )
+                last_level_config = game_config[request.last_level]
+                last_level_key = request.last_level
+                # Remove the last level from the main config so it's not used in middle levels
+                remaining_config = {k: v for k, v in game_config.items() if k != request.last_level}
+                request.level_count = len(remaining_config) + 1  # +1 for the designated last level
+            else:
+                request.level_count = len(game_config)
 
         # all games need at least 1 level
         if request.level_count < 1:
@@ -143,10 +161,28 @@ def create_game(
         
         if game_config:
             level_data_map = {}
-            for i, (level_key, level_data) in enumerate(game_config.items()):
-                level_id = levels[i].id
-                print(f"Creating level file for level_id: {level_id}")
-                level_data_map[level_id] = level_data
+            
+            if request.last_level and last_level_config:
+                # Handle the designated last level
+                last_level_id = levels[-1].id  # Last level in the list
+                print(f"Creating designated last level file for level_id: {last_level_id} with key: {last_level_key}")
+                level_data_map[last_level_id] = last_level_config
+                
+                # Create the remaining levels (excluding the designated last level)
+                remaining_config = {k: v for k, v in game_config.items() if k != request.last_level}
+                for i, (level_key, level_data) in enumerate(remaining_config.items()):
+                    level_id = levels[i].id  # Use levels[0] to levels[-2]
+                    print(f"Creating level file for level_id: {level_id}")
+                    level_data_map[level_id] = level_data
+            else:
+                # Original behavior - use all levels from config in order
+                for i, (level_key, level_data) in enumerate(game_config.items()):
+                    level_id = levels[i].id
+                    print(f"Creating level file for level_id: {level_id}")
+                    level_data_map[level_id] = level_data
+            
+            # Write all level files
+            for level_id, level_data in level_data_map.items():
                 level_dir = os.path.join(GAMES_DIR, str(new_game.id), "levels")
                 os.makedirs(level_dir, exist_ok=True)
                 file_path = os.path.join(level_dir, f"{str(level_id)}.json")
@@ -180,6 +216,7 @@ def create_game(
             i: set() for i in range(len(middle_levels))
         }
 
+        # Rest of the function remains the same...
         # set team levels, prioritizing uniqueness in order per team
         # first and last levels are the same for all teams
         team_levels: List[TeamLevel] = []
@@ -263,6 +300,7 @@ def create_game(
             content={
                 "message": f"Game '{request.name}' with {request.level_count} levels and {request.team_count} teams created successfully.",
                 "game_id": str(new_game.id),
+                "last_level_used": last_level_key if last_level_key else "None specified",
             },
             media_type="application/json",
         )
@@ -277,7 +315,7 @@ def create_game(
         )
     finally:
         db.close()
-
+        
 
 @app.put("/api/level/{level_id}")
 def upload_level_data(

@@ -430,7 +430,8 @@ export default function Chat() {
                       </span>
                     </span>
                   ) : (
-                    <Markdown>{displayText}</Markdown>
+                    // <Markdown>{displayText}</Markdown>
+                    displayText
                   )}
                   {message.sender === "system" && !isLoadingMessage && (
                     <Box
