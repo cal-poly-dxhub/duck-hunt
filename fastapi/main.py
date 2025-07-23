@@ -8,10 +8,19 @@ from uuid import UUID
 from bedrock import invoke_llm
 from database import SessionLocal
 from dotenv import load_dotenv
-from models import CoordinateSnapshot, Game, Level, Message, Team, TeamLevel, User
+from models import (
+    CoordinateSnapshot,
+    Game,
+    Level,
+    Message,
+    Photo,
+    Team,
+    TeamLevel,
+    User,
+)
 from pydantic import BaseModel
 
-from fastapi import Body, FastAPI, Form, Header, HTTPException
+from fastapi import Body, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -370,9 +379,11 @@ def at_level(
             return JSONResponse(
                 content={
                     # TODO: do not show the actual level id
-                    "message": f"You are at level {current_team_level.level_id}.",
+                    "message": f"You are at level {current_team_level.id}.",
                     "level_id": str(current_team_level.level_id),
-                    "message_history": fetch_user_messages(user_id, team_id, level_id),
+                    "message_history": fetch_user_messages(
+                        user_id, team_id, current_team_level.level_id.__str__()
+                    ),
                 },
                 media_type="application/json",
             )
@@ -391,7 +402,7 @@ def at_level(
         if any(tl.level_id == submitted_level_id for tl in current_and_previous_levels):
             return JSONResponse(
                 content={
-                    "message": f"You are at level {current_team_level.level_id}.",
+                    "message": f"You are at level {current_team_level.id}.",
                     "level_id": str(current_team_level.level_id),
                     "message_history": fetch_user_messages(user_id, team_id, level_id),
                 },
@@ -406,15 +417,15 @@ def at_level(
                 break
 
         if next_team_level and next_team_level.level_id == submitted_level_id:  # type: ignore
-            # TODO: photo submission
             # mark current level as completed and advance
             db.query(TeamLevel).filter(TeamLevel.id == current_team_level.id).update(
                 {"completed_at": datetime.now()}
             )
             db.commit()
+
             return JSONResponse(
                 content={
-                    "message": f"Congratulations. You are now at level {next_team_level.level_id}.",
+                    "message": f"Congratulations. Your team has completed level {current_team_level.id}. Upload a team photo with your duck at your location!",
                     "level_id": str(next_team_level.level_id),
                     "message_history": [],  # no messages if new level
                 },
@@ -627,6 +638,36 @@ def message(
             user = User(id=UUID(user_id), team_id=team.id)
             db.add(user)
             db.commit()
+
+        # check if photo for previous location
+        previous_team_level: TeamLevel = (
+            db.query(TeamLevel)
+            .filter(TeamLevel.team_id == team_id, TeamLevel.completed_at.isnot(None))
+            .order_by(TeamLevel.completed_at.desc())
+            .first()
+        )  # type: ignore
+        if previous_team_level:
+            # check if photo exists for previous level
+            previous_photo: Photo = (
+                db.query(Photo)
+                .filter(
+                    Photo.user_id == user_id,
+                    Photo.team_id == team_id,
+                    Photo.level_id == previous_team_level.level_id,
+                )
+                .first()
+            )
+
+            if not previous_photo:
+                raise HTTPException(
+                    status_code=406,
+                    detail="You must upload a photo of your duck at your location before sending a message.",
+                )
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail="Previous team level not found.",
+            )
 
         # get current team level
         team_level: TeamLevel = (
@@ -896,5 +937,99 @@ def ping_coordinates(
             media_type="application/json",
             status_code=500,
         )
+    finally:
+        db.close()
+
+
+# route for team photo uploads
+@app.post("/api/team-photo")
+def team_photo(
+    user_id: Annotated[Union[str, None], Header()] = None,
+    team_id: Annotated[Union[str, None], Header()] = None,
+    photo: Annotated[Union[UploadFile, None], File()] = None,
+):
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid user id")
+
+    if not team_id:
+        raise HTTPException(status_code=401, detail="Invalid team id")
+
+    try:
+        UUID(user_id)
+    except:
+        raise HTTPException(status_code=401, detail="Invalid user id format")
+
+    try:
+        UUID(team_id)
+    except:
+        raise HTTPException(status_code=401, detail="Invalid team id format")
+
+    if not photo:
+        raise HTTPException(status_code=400, detail="No photo provided")
+
+    db = SessionLocal()
+    try:
+        # get team
+        team: Team = db.query(Team).filter(Team.id == team_id).first()
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
+
+        user: User = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # upload photo to ./photos/{team_id}/
+        dir_path = f"./photos/{team_id}/"
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+
+        photo_path = os.path.join(dir_path, photo.filename or "photo.jpg")
+
+        f = open(photo_path, "wb")
+        f.write(photo.file.read())
+
+        # photo tied to location that has been finished
+        previous_level = (
+            db.query(TeamLevel)
+            .filter(TeamLevel.team_id == team_id, TeamLevel.completed_at.isnot(None))
+            .order_by(TeamLevel.index.desc())
+            .first()
+        )
+
+        if not previous_level:
+            raise HTTPException(status_code=404, detail="Team level not found")
+
+        # create photo
+        db_photo: Photo = Photo(
+            user_id=user.id,
+            team_id=team.id,
+            game_id=team.game_id,
+            level_id=previous_level.level_id,
+            url=photo_path,
+        )
+
+        db.add(db_photo)
+        db.commit()
+
+        return JSONResponse(
+            content={
+                "message": "Photo uploaded sucessfully.",
+            },
+            media_type="application/json",
+        )
+
+    except HTTPException as he:
+        db.rollback()
+        print(f"HTTP error: {str(he.detail)}")
+        return JSONResponse(
+            content={"error": he.detail},
+            media_type="application/json",
+            status_code=he.status_code,
+        )
+
+    except Exception as e:
+        print(f"Error sending message: {str(e)}")
+        db.rollback()
+
     finally:
         db.close()

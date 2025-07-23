@@ -69,6 +69,8 @@ change the line in `alembic.ini`:
 sqlalchemy.url = postgresql://your_username@localhost:5432/duck_hunt
 ```
 
+(Again replace `your_username` with your actual macOS username.)
+
 9. update `alembic/env.py` to import your models
 
 ```python
@@ -93,15 +95,39 @@ fastapi run main.py
 
 ### setup nextjs app
 
-1. in a new terminal, install dependencies
+1. in a new terminal, create an .env file:
+
+```bash
+cp .env.example .env
+```
+
+2. add the api endpoint to `env`:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL="http://localhost:8000/api"
+```
+
+4. in a new terminal, install dependencies
 
 ```bash
 cd next-app
 yarn install
 ```
 
-2. run the nextjs app
+5. run the nextjs app
 
 ```bash
 yarn dev
+```
+
+### create a game
+
+1. make a `POST` request to the api endpoint
+
+```bash
+curl -H "Content-Type: application/json"
+    -H "api-key: your-api-key"
+    -D "{}"
+    "http://localhost:8000/api/create-game"
+    --
 ```

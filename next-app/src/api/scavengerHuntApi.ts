@@ -9,6 +9,10 @@ const message = async (prompt: string) => {
       }
     );
 
+    if (response.status === 406) {
+      return { success: false, status: 406, error: response.error };
+    }
+
     if (!response.success) {
       console.error("API Error:", response);
       throw new Error(response.error || "Failed to send message");
@@ -16,15 +20,17 @@ const message = async (prompt: string) => {
 
     return {
       success: true,
+      status: response.status,
       message: response.data.response,
     };
   } catch (error) {
     console.error("Error in message function:", error);
     if ((error as { status?: number }).status === 500) {
-      return { success: false, error: "Failed to send message" };
+      return { success: false, status: 500, error: "Failed to send message" };
     } else {
       return {
         success: false,
+        status: 500,
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }
@@ -182,10 +188,58 @@ const pingCoordinates = async () => {
   }
 };
 
+const uploadTeamPhoto = async (file: File) => {
+  try {
+    const formData = new FormData();
+    formData.append("photo", file);
+
+    const teamId = localStorage.getItem("teamId");
+    const userId = localStorage.getItem("userId");
+
+    if (!teamId || !userId) {
+      throw new Error("Team ID or User ID not found in local storage");
+    }
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/team-photo`,
+      {
+        method: "POST",
+        body: formData,
+        headers: {
+          "user-id": userId,
+          "team-id": teamId,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to upload photo");
+    }
+
+    return {
+      success: true,
+      message: data.message || "Photo uploaded successfully",
+    };
+  } catch (error) {
+    console.error("Error in uploadTeamPhoto function:", error);
+    if ((error as { status?: number }).status === 500) {
+      return { success: false, error: "Failed to upload photo" };
+    } else {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+};
+
 export const scavengerHuntApi = {
   message,
   atLevel,
   pingCoordinates,
   finishGame,
   clearChat,
+  uploadTeamPhoto,
 };

@@ -6,16 +6,19 @@ import { Message } from "@/constants/types";
 import {
   ActionIcon,
   Box,
+  Button,
   Container,
   Flex,
+  Modal,
   Stack,
   Text,
   TextInput,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
-import { IconSend, IconTrash } from "@tabler/icons-react";
+import { IconSend, IconTrash, IconUpload } from "@tabler/icons-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+// import Markdown from "react-markdown";
 
 const blinkAnimation = `
   @keyframes blink {
@@ -38,6 +41,8 @@ export default function Chat() {
   const [typingMessages, setTypingMessages] = useState<Record<number, string>>(
     {}
   );
+
+  const [needsTeamPhoto, setNeedsTeamPhoto] = useState<boolean>(false);
 
   const {
     userId,
@@ -89,6 +94,13 @@ export default function Chat() {
     try {
       const data = await scavengerHuntApi.message(prompt);
 
+      if (data.status === 406) {
+        setNeedsTeamPhoto(true);
+        // revert to previous messages
+        setMessages((prev) => prev.slice(0, -2));
+        return;
+      }
+
       if (!data.success) {
         throw new Error(data.error || "Unknown error");
       }
@@ -137,9 +149,7 @@ export default function Chat() {
   const levelIdFromUrl = searchParams.get("level-id");
   const endSequenceFromUrl = searchParams.get("end-sequence");
 
-  /**
-   * team id
-   */
+  // team id
   useEffect(() => {
     if (gameLoading) {
       return;
@@ -169,9 +179,7 @@ export default function Chat() {
     }
   }, [teamIdFromUrl, teamId, setTeamId, gameLoading, userId, setUserId]);
 
-  /**
-   * check if ids present
-   */
+  // check if ids present
   useEffect(() => {
     if (gameLoading) return;
     if (teamIdFromUrl) return;
@@ -192,9 +200,7 @@ export default function Chat() {
     }
   }, [teamId, teamIdFromUrl, gameLoading]);
 
-  /**
-   * end sequence or at level
-   */
+  // end sequence or at level
   useEffect(() => {
     const handleCheckLocation = async () => {
       if (endSequenceFromUrl) {
@@ -239,7 +245,10 @@ export default function Chat() {
           timestamp: new Date(),
         };
 
-        setMessages([systemMessage, ...(data?.messageHistory ?? [])]);
+        setMessages([
+          systemMessage,
+          ...((data?.messageHistory as unknown as Message[]) ?? []),
+        ]);
         typeMessage(systemMessage.id, systemMessage.text);
         setLoading(false);
       } catch (error) {
@@ -263,9 +272,7 @@ export default function Chat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, teamId, levelIdFromUrl, endSequenceFromUrl]);
 
-  /**
-   * ping location
-   */
+  // ping location interval
   useEffect(() => {
     const interval = setInterval(() => {
       scavengerHuntApi.pingCoordinates();
@@ -284,6 +291,69 @@ export default function Chat() {
         fontFamily: "monospace",
       }}
     >
+      {/* Team Photo Upload Modal */}
+      <Modal
+        opened={needsTeamPhoto}
+        onClose={() => setNeedsTeamPhoto(false)}
+        title="Team Photo Required"
+        centered
+        styles={{
+          title: {
+            fontFamily: "monospace",
+            color: "var(--mantine-color-green-5)",
+          },
+          header: { backgroundColor: "var(--mantine-color-dark-7)" },
+          content: { backgroundColor: "var(--mantine-color-dark-7)" },
+        }}
+      >
+        <Box p="md" bg="dark.7" ff="monospace">
+          <Text c="green.5" mb="md">
+            Please upload a team photo to continue with the game. If your team
+            has already uploaded a photo, refresh the page or contact the
+            GameMakers.
+          </Text>
+          <input
+            type="file"
+            id="team-photo"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                try {
+                  const result = await scavengerHuntApi.uploadTeamPhoto(file);
+                  if (result.success) {
+                    setNeedsTeamPhoto(false);
+                    const successMessage: Message = {
+                      id: messages.length + 1,
+                      text: `> ${result.message}`,
+                      sender: "system",
+                      timestamp: new Date(),
+                    };
+                    setMessages((prev) => [...prev, successMessage]);
+                    typeMessage(successMessage.id, successMessage.text);
+                  } else {
+                    alert(`Error: ${result.error}`);
+                  }
+                } catch (error) {
+                  console.error("Error uploading team photo:", error);
+                  alert("Failed to upload team photo. Please try again.");
+                }
+              }
+            }}
+          />
+          <Button
+            fullWidth
+            leftSection={<IconUpload size="1rem" />}
+            onClick={() => document.getElementById("team-photo")?.click()}
+            color="green"
+            style={{ fontFamily: "monospace" }}
+          >
+            Upload Team Photo
+          </Button>
+        </Box>
+      </Modal>
+
       <Container
         size="lg"
         h="100dvh"
@@ -360,6 +430,7 @@ export default function Chat() {
                       </span>
                     </span>
                   ) : (
+                    // <Markdown>{displayText}</Markdown>
                     displayText
                   )}
                   {message.sender === "system" && !isLoadingMessage && (

@@ -7,3 +7,4 @@ alembic.ini
 alembic/versions/*
 games/
 alembic/
+photos/
