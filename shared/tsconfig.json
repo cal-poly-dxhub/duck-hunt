@@ -9,10 +9,8 @@
     "declaration": false,
     "sourceMap": false,
     "outDir": "./dist",
-    "paths": {
-      "@shared/*": ["../shared/src/*"]
-    }
+    "rootDir": "./src"
   },
-  "include": ["./src/**/*.ts", "src/frontend-rewrite.js"],
+  "include": ["./src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

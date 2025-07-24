@@ -1,23 +1,21 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 
-export interface PublicApiResourcesProps {}
+export interface AdminApiResourcesProps {
+  uniqueId: string;
+}
 
-export class PublicApiResources extends Construct {
-  public readonly publicApi: cdk.aws_apigateway.RestApi;
+export class AdminApiResources extends Construct {
+  public readonly adminApi: cdk.aws_apigateway.RestApi;
 
-  constructor(
-    scope: Construct,
-    id: string,
-    props: PublicApiResourcesProps = {}
-  ) {
+  constructor(scope: Construct, id: string, props: AdminApiResourcesProps) {
     super(scope, id);
 
-    // reference stack
+    // reference stack if needed
     const stack = cdk.Stack.of(this);
 
     // api
-    this.publicApi = new cdk.aws_apigateway.RestApi(this, "MeetingAuthApi", {
+    this.adminApi = new cdk.aws_apigateway.RestApi(this, "MeetingAuthApi", {
       description: "API for video authentication",
       deployOptions: {
         stageName: "prod",
@@ -31,5 +29,10 @@ export class PublicApiResources extends Construct {
         allowMethods: cdk.aws_apigateway.Cors.ALL_METHODS,
       },
     });
+
+    // /api/admin resource
+    const apiResource = this.adminApi.root
+      .addResource("api")
+      .addResource("admin");
   }
 }
