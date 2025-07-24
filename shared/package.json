@@ -1,0 +1,8 @@
+{
+  "name": "shared",
+  "version": "1.0.0",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc && cp src/frontend-rewrite.js dist/frontend-rewrite.js"
+  }
+}

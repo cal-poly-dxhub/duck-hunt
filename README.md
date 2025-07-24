@@ -1,133 +1,145 @@
-# Duck Hunt - AI Scavenger Hunt - An Impossible Game That Teaches Prompt Injection and Teamwork
+# cdk duck hunt
 
-## you may ask: why a monolith?
+NOT a monolith anymore
 
-- because it doesnt need to be scalable this is like 150 ppl max atm
+## Prerequisites
 
-## setup python
+1. Install [Node.js](https://nodejs.org/)
 
-1. install postgres on your machine
+2. Install [Yarn](https://yarnpkg.com/getting-started/install)
 
-### macos:
+3. Install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 
-```bash
-brew install postgresql@17
-```
+4. Install [AWS CDK CLI](https://docs.aws.amazon.com/cdk/latest/guide/cli.html) (`npm install -g aws-cdk`)
 
-2. start postgres
+5. Update Yarn to the latest version
 
-```bash
-brew services start postgresql@17
-```
+   ```bash
+   yarn set version latest
+   ```
 
-3. create the database for duck hunt
+## Development
 
-```bash
-createdb duck_hunt
-```
+1. For development, choose an [issue](https://github.com/cal-poly-dxhub/duck-hunt/issues) and create a feature branch:
 
-4. create and activate virtual environment
+   ```bash
+   git checkout -b <branch-name>
+   ```
 
-```bash
-python3.9 -m venv .venv
-source .venv/bin/activate
-pip install -r fastapi/requirements.txt
-```
+2. Commit regularly
 
-5. create environment file
+3. Create a pull request when your feature is complete
 
-```bash
-cd fastapi
-cp .env.example .env
-```
+## Setup
 
-Then edit the `.env` file and update the database URL with your username:
+1. Clone the repository
 
-```env
-DATABASE_URL=postgresql://your_username@localhost:5432/duck_hunt
-```
+   ```bash
+   git clone https://github.com/cal-poly-dxhub/duck-hunt.git
+   ```
 
-(Replace `your_username` with your actual macOS username. You can find it by running `whoami` in the terminal)
+2. Navigate to the project directory
 
-6. install dependencies
+   ```bash
+   cd duck-hunt
+   ```
 
-```bash
-pip install -r requirements.txt
-```
+3. Install dependencies
 
-7. setup alembic
+   ```bash
+   yarn install
+   ```
 
-```bash
-alembic init alembic
-```
+4. Configure AWS credentials
 
-8. update `alembic.ini` to point to your database
+   Ensure you have your AWS credentials set up. You can configure them using the AWS CLI:
 
-change the line in `alembic.ini`:
+   ```bash
+   aws configure
+   ```
 
-```ini
-sqlalchemy.url = postgresql://your_username@localhost:5432/duck_hunt
-```
+   Follow the prompts to enter your AWS Access Key ID, Secret Access Key, region, and output format.
 
-(Again replace `your_username` with your actual macOS username.)
+5. Bootstrap the CDK environment
 
-9. update `alembic/env.py` to import your models
+   ```bash
+   cdk bootstrap
+   ```
 
-```python
-# target_metadata = None # comment this line
-from models import Base  # import your models here
-target_metadata = Base.metadata
-```
+   This command sets up the necessary resources in your AWS account to deploy CDK applications.
 
-10. create the initial migration
+## Stack Development
 
-```bash
-alembic revision --autogenerate -m "initial migration"
-alembic upgrade head
-cd ..
-```
+Create new Resources file. Copy paste and existing resource file such as `lib/database.ts` and modify it to suit your needs.
 
-11. start the api
+## Lambda Development
 
-```bash
-fastapi run main.py
-```
+1. Navigate to the `lambda` directory
 
-### setup nextjs app
+   ```bash
+   cd lambda
+   ```
 
-1. in a new terminal, create an .env file:
+2. Install Lambda dependencies
 
-```bash
-cp .env.example .env
-```
+   ```bash
+   yarn install
+   ```
 
-2. add the api endpoint to `env`:
+3. Install additional dependencies
 
-```bash
-NEXT_PUBLIC_API_BASE_URL="http://localhost:8000/api"
-```
+   ```bash
+   yarn add <package-name>
+   ```
 
-4. in a new terminal, install dependencies
+## DynamoDB Schema
 
-```bash
-cd next-app
-yarn install
-```
+This project uses a single-table design for DynamoDB. The schema is defined in `DB_SCHEMA.md`.
 
-5. run the nextjs app
+## Frontend Development
 
-```bash
-yarn dev
-```
+1. Navigate to the `frontend` directory
 
-### create a game
+   ```bash
+   cd frontend
+   ```
 
-1. make a `POST` request to the api endpoint
+2. Install frontend dependencies
 
-```bash
-curl -H "Content-Type: application/json"
-    -H "api-key: your-api-key"
-    -D "{}"
-    "http://localhost:8000/api/create-game"
-    --
-```
+   ```bash
+   yarn install
+   ```
+
+3. Copy `.env.example` to `.env` and update the environment variables as needed.
+
+   ```bash
+   cp .env.example .env
+   ```
+
+4. Start the frontend development server
+
+   ```bash
+   yarn dev
+   ```
+
+## Deployment
+
+1. Create a `deploy.sh` script in the root directory:
+
+   ```bash
+   cp deploy.sh.example deploy.sh
+   ```
+
+   Update the `UNIQUE_ID` variable in `deploy.sh` to a unique value.
+
+2. Make the script executable:
+
+   ```bash
+   chmod +x deploy.sh
+   ```
+
+3. Run the deployment script:
+
+   ```bash
+   ./deploy.sh
+   ```

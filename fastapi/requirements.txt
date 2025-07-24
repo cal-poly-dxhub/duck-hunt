@@ -1,8 +1,0 @@
-fastapi
-fastapi[standard]
-numpy
-boto3
-sqlalchemy
-alembic
-psycopg2-binary
-python-dotenv
