@@ -43,10 +43,10 @@ export class LevelOperations {
     };
 
     const item = {
-      PK: `GAME#\${level.game_id}`,
-      SK: `LEVEL#\${level.id}`,
-      GSI1PK: `LEVEL#\${level.id}`,
-      GSI1SK: `GAME#\${level.game_id}`,
+      PK: `GAME#${level.game_id}`,
+      SK: `LEVEL#${level.id}`,
+      GSI1PK: `LEVEL#${level.id}`,
+      GSI1SK: `GAME#${level.game_id}`,
       ItemType: "LEVEL",
       ...level,
     };
@@ -66,8 +66,8 @@ export class LevelOperations {
       new GetCommand({
         TableName: TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
-          SK: `LEVEL#\${levelId}`,
+          PK: `GAME#${gameId}`,
+          SK: `LEVEL#${levelId}`,
         },
       })
     );
@@ -84,7 +84,7 @@ export class LevelOperations {
         TableName: TABLE_NAME,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
         ExpressionAttributeValues: {
-          ":pk": `GAME#\${gameId}`,
+          ":pk": `GAME#${gameId}`,
           ":sk": "LEVEL#",
         },
       })
@@ -110,19 +110,19 @@ export class LevelOperations {
     updates.updated_at = getCurrentTimestamp();
 
     for (const [key, value] of Object.entries(updates)) {
-      updateExpression.push(`#\${key} = :\${key}`);
-      expressionAttributeNames[`#\${key}`] = key;
-      expressionAttributeValues[`:\${key}`] = value;
+      updateExpression.push(`#${key} = :${key}`);
+      expressionAttributeNames[`#${key}`] = key;
+      expressionAttributeValues[`:${key}`] = value;
     }
 
     const result = await docClient.send(
       new UpdateCommand({
         TableName: TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
-          SK: `LEVEL#\${levelId}`,
+          PK: `GAME#${gameId}`,
+          SK: `LEVEL#${levelId}`,
         },
-        UpdateExpression: `SET \${updateExpression.join(', ')}`,
+        UpdateExpression: `SET ${updateExpression.join(", ")}`,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
         ReturnValues: "ALL_NEW",
@@ -138,8 +138,8 @@ export class LevelOperations {
       new DeleteCommand({
         TableName: TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
-          SK: `LEVEL#\${levelId}`,
+          PK: `GAME#${gameId}`,
+          SK: `LEVEL#${levelId}`,
         },
       })
     );

@@ -28,12 +28,12 @@ export class CoordinateSnapshotOperations {
     };
 
     const timestamp = getEpochTimestamp();
-    const sortKey = `COORDINATE_SNAPSHOT#\${timestamp}#\${coordinate.id}`;
+    const sortKey = `COORDINATE_SNAPSHOT#${timestamp}#${coordinate.id}`;
 
     const item = {
-      PK: `USER#\${coordinate.user_id}`,
+      PK: `USER#${coordinate.user_id}`,
       SK: sortKey,
-      GSI1PK: `TEAM#\${coordinate.team_id}`,
+      GSI1PK: `TEAM#${coordinate.team_id}`,
       GSI1SK: sortKey,
       ItemType: "COORDINATE_SNAPSHOT",
       ...coordinate,
@@ -58,7 +58,7 @@ export class CoordinateSnapshotOperations {
         TableName: TABLE_NAME,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
         ExpressionAttributeValues: {
-          ":pk": `USER#\${userId}`,
+          ":pk": `USER#${userId}`,
           ":sk": "COORDINATE_SNAPSHOT#",
         },
         ScanIndexForward: false,
@@ -85,7 +85,7 @@ export class CoordinateSnapshotOperations {
         KeyConditionExpression:
           "GSI1PK = :gsi1pk AND begins_with(GSI1SK, :gsi1sk)",
         ExpressionAttributeValues: {
-          ":gsi1pk": `TEAM#\${teamId}`,
+          ":gsi1pk": `TEAM#${teamId}`,
           ":gsi1sk": "COORDINATE_SNAPSHOT#",
         },
         ScanIndexForward: false,

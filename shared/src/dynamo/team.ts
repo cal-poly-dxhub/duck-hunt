@@ -27,8 +27,8 @@ export class TeamOperations {
     };
 
     const item = {
-      PK: `GAME#\${team.game_id}`,
-      SK: `TEAM#\${team.id}`,
+      PK: `GAME#${team.game_id}`,
+      SK: `TEAM#${team.id}`,
       ItemType: "TEAM",
       ...team,
     };
@@ -48,8 +48,8 @@ export class TeamOperations {
       new GetCommand({
         TableName: TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
-          SK: `TEAM#\${teamId}`,
+          PK: `GAME#${gameId}`,
+          SK: `TEAM#${teamId}`,
         },
       })
     );
@@ -66,7 +66,7 @@ export class TeamOperations {
         TableName: TABLE_NAME,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
         ExpressionAttributeValues: {
-          ":pk": `GAME#\${gameId}`,
+          ":pk": `GAME#${gameId}`,
           ":sk": "TEAM#",
         },
       })
@@ -92,19 +92,19 @@ export class TeamOperations {
     updates.updated_at = getCurrentTimestamp();
 
     for (const [key, value] of Object.entries(updates)) {
-      updateExpression.push(`#\${key} = :\${key}`);
-      expressionAttributeNames[`#\${key}`] = key;
-      expressionAttributeValues[`:\${key}`] = value;
+      updateExpression.push(`#${key} = :${key}`);
+      expressionAttributeNames[`#${key}`] = key;
+      expressionAttributeValues[`:${key}`] = value;
     }
 
     const result = await docClient.send(
       new UpdateCommand({
         TableName: TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
-          SK: `TEAM#\${teamId}`,
+          PK: `GAME#${gameId}`,
+          SK: `TEAM#${teamId}`,
         },
-        UpdateExpression: `SET \${updateExpression.join(', ')}`,
+        UpdateExpression: `SET ${updateExpression.join(", ")}`,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
         ReturnValues: "ALL_NEW",
@@ -120,8 +120,8 @@ export class TeamOperations {
       new DeleteCommand({
         TableName: TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
-          SK: `TEAM#\${teamId}`,
+          PK: `GAME#${gameId}`,
+          SK: `TEAM#${teamId}`,
         },
       })
     );

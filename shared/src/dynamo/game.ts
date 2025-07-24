@@ -28,7 +28,7 @@ export class GameOperations {
     };
 
     const item = {
-      PK: `GAME#\${game.id}`,
+      PK: `GAME#${game.id}`,
       SK: "#METADATA",
       ItemType: "GAME",
       ...game,
@@ -49,7 +49,7 @@ export class GameOperations {
       new GetCommand({
         TableName: TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
+          PK: `GAME#${gameId}`,
           SK: "#METADATA",
         },
       })
@@ -73,19 +73,19 @@ export class GameOperations {
     updates.updated_at = getCurrentTimestamp();
 
     for (const [key, value] of Object.entries(updates)) {
-      updateExpression.push(`#\${key} = :\${key}`);
-      expressionAttributeNames[`#\${key}`] = key;
-      expressionAttributeValues[`:\${key}`] = value;
+      updateExpression.push(`#${key} = :${key}`);
+      expressionAttributeNames[`#${key}`] = key;
+      expressionAttributeValues[`:${key}`] = value;
     }
 
     const result = await docClient.send(
       new UpdateCommand({
         TableName: TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
+          PK: `GAME#${gameId}`,
           SK: "#METADATA",
         },
-        UpdateExpression: `SET \${updateExpression.join(', ')}`,
+        UpdateExpression: `SET ${updateExpression.join(", ")}`,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
         ReturnValues: "ALL_NEW",
@@ -101,7 +101,7 @@ export class GameOperations {
       new DeleteCommand({
         TableName: TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
+          PK: `GAME#${gameId}`,
           SK: "#METADATA",
         },
       })

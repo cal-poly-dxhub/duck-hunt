@@ -29,16 +29,16 @@ export class PhotoOperations {
     };
 
     const timestamp = getEpochTimestamp();
-    const sortKey = `PHOTO#\${timestamp}#\${photo.id}`;
+    const sortKey = `PHOTO#${timestamp}#${photo.id}`;
 
     const item = {
-      PK: `USER#\${photo.user_id}`,
+      PK: `USER#${photo.user_id}`,
       SK: sortKey,
-      GSI1PK: `TEAM#\${photo.team_id}`,
+      GSI1PK: `TEAM#${photo.team_id}`,
       GSI1SK: sortKey,
-      GSI2PK: `GAME#\${photo.game_id}`,
+      GSI2PK: `GAME#${photo.game_id}`,
       GSI2SK: sortKey,
-      GSI3PK: `LEVEL#\${photo.level_id}`,
+      GSI3PK: `LEVEL#${photo.level_id}`,
       GSI3SK: sortKey,
       ItemType: "PHOTO",
       ...photo,
@@ -60,7 +60,7 @@ export class PhotoOperations {
         TableName: TABLE_NAME,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
         ExpressionAttributeValues: {
-          ":pk": `USER#\${userId}`,
+          ":pk": `USER#${userId}`,
           ":sk": "PHOTO#",
         },
         ScanIndexForward: false,
@@ -95,7 +95,7 @@ export class PhotoOperations {
         KeyConditionExpression:
           "GSI1PK = :gsi1pk AND begins_with(GSI1SK, :gsi1sk)",
         ExpressionAttributeValues: {
-          ":gsi1pk": `TEAM#\${teamId}`,
+          ":gsi1pk": `TEAM#${teamId}`,
           ":gsi1sk": "PHOTO#",
         },
         ScanIndexForward: false,
@@ -130,7 +130,7 @@ export class PhotoOperations {
         KeyConditionExpression:
           "GSI2PK = :gsi2pk AND begins_with(GSI2SK, :gsi2sk)",
         ExpressionAttributeValues: {
-          ":gsi2pk": `GAME#\${gameId}`,
+          ":gsi2pk": `GAME#${gameId}`,
           ":gsi2sk": "PHOTO#",
         },
         ScanIndexForward: false,
@@ -165,7 +165,7 @@ export class PhotoOperations {
         KeyConditionExpression:
           "GSI3PK = :gsi3pk AND begins_with(GSI3SK, :gsi3sk)",
         ExpressionAttributeValues: {
-          ":gsi3pk": `LEVEL#\${levelId}`,
+          ":gsi3pk": `LEVEL#${levelId}`,
           ":gsi3sk": "PHOTO#",
         },
         ScanIndexForward: false,

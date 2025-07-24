@@ -27,10 +27,10 @@ export class TeamLevelOperations {
     };
 
     const item = {
-      PK: `TEAM#\${teamLevel.team_id}`,
-      SK: `LEVEL#\${teamLevel.level_id}`,
-      GSI1PK: `LEVEL#\${teamLevel.level_id}`,
-      GSI1SK: `TEAM#\${teamLevel.team_id}`,
+      PK: `TEAM#${teamLevel.team_id}`,
+      SK: `LEVEL#${teamLevel.level_id}`,
+      GSI1PK: `LEVEL#${teamLevel.level_id}`,
+      GSI1SK: `TEAM#${teamLevel.team_id}`,
       ItemType: "TEAM_LEVEL",
       ...teamLevel,
     };
@@ -51,7 +51,7 @@ export class TeamLevelOperations {
         TableName: TABLE_NAME,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
         ExpressionAttributeValues: {
-          ":pk": `TEAM#\${teamId}`,
+          ":pk": `TEAM#${teamId}`,
           ":sk": "LEVEL#",
         },
       })
@@ -72,7 +72,7 @@ export class TeamLevelOperations {
         IndexName: "GSI1",
         KeyConditionExpression: "GSI1PK = :gsi1pk",
         ExpressionAttributeValues: {
-          ":gsi1pk": `LEVEL#\${levelId}`,
+          ":gsi1pk": `LEVEL#${levelId}`,
         },
       })
     );
@@ -99,19 +99,19 @@ export class TeamLevelOperations {
     updates.updated_at = getCurrentTimestamp();
 
     for (const [key, value] of Object.entries(updates)) {
-      updateExpression.push(`#\${key} = :\${key}`);
-      expressionAttributeNames[`#\${key}`] = key;
-      expressionAttributeValues[`:\${key}`] = value;
+      updateExpression.push(`#${key} = :${key}`);
+      expressionAttributeNames[`#${key}`] = key;
+      expressionAttributeValues[`:${key}`] = value;
     }
 
     const result = await docClient.send(
       new UpdateCommand({
         TableName: TABLE_NAME,
         Key: {
-          PK: `TEAM#\${teamId}`,
-          SK: `LEVEL#\${levelId}`,
+          PK: `TEAM#${teamId}`,
+          SK: `LEVEL#${levelId}`,
         },
-        UpdateExpression: `SET \${updateExpression.join(', ')}`,
+        UpdateExpression: `SET ${updateExpression.join(", ")}`,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
         ReturnValues: "ALL_NEW",
@@ -128,8 +128,8 @@ export class TeamLevelOperations {
       new DeleteCommand({
         TableName: TABLE_NAME,
         Key: {
-          PK: `TEAM#\${teamId}`,
-          SK: `LEVEL#\${levelId}`,
+          PK: `TEAM#${teamId}`,
+          SK: `LEVEL#${levelId}`,
         },
       })
     );

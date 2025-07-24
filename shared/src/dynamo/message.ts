@@ -38,16 +38,16 @@ export class MessageOperations {
     };
 
     const timestamp = getEpochTimestamp();
-    const sortKey = `MESSAGE#\${timestamp}#\${message.id}`;
+    const sortKey = `MESSAGE#${timestamp}#${message.id}`;
 
     const item = {
-      PK: `USER#\${message.user_id}`,
+      PK: `USER#${message.user_id}`,
       SK: sortKey,
-      GSI1PK: `TEAM#\${message.team_id}`,
+      GSI1PK: `TEAM#${message.team_id}`,
       GSI1SK: sortKey,
-      GSI2PK: `GAME#\${message.game_id}`,
+      GSI2PK: `GAME#${message.game_id}`,
       GSI2SK: sortKey,
-      GSI3PK: `LEVEL#\${message.level_id}`,
+      GSI3PK: `LEVEL#${message.level_id}`,
       GSI3SK: sortKey,
       ItemType: "MESSAGE",
       ...message,
@@ -69,7 +69,7 @@ export class MessageOperations {
         TableName: TABLE_NAME,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
         ExpressionAttributeValues: {
-          ":pk": `USER#\${userId}`,
+          ":pk": `USER#${userId}`,
           ":sk": "MESSAGE#",
         },
         ScanIndexForward: false, // Most recent first
@@ -104,7 +104,7 @@ export class MessageOperations {
         KeyConditionExpression:
           "GSI1PK = :gsi1pk AND begins_with(GSI1SK, :gsi1sk)",
         ExpressionAttributeValues: {
-          ":gsi1pk": `TEAM#\${teamId}`,
+          ":gsi1pk": `TEAM#${teamId}`,
           ":gsi1sk": "MESSAGE#",
         },
         ScanIndexForward: false,
@@ -139,7 +139,7 @@ export class MessageOperations {
         KeyConditionExpression:
           "GSI2PK = :gsi2pk AND begins_with(GSI2SK, :gsi2sk)",
         ExpressionAttributeValues: {
-          ":gsi2pk": `GAME#\${gameId}`,
+          ":gsi2pk": `GAME#${gameId}`,
           ":gsi2sk": "MESSAGE#",
         },
         ScanIndexForward: false,
@@ -177,7 +177,7 @@ export class MessageOperations {
         KeyConditionExpression:
           "GSI3PK = :gsi3pk AND begins_with(GSI3SK, :gsi3sk)",
         ExpressionAttributeValues: {
-          ":gsi3pk": `LEVEL#\${levelId}`,
+          ":gsi3pk": `LEVEL#${levelId}`,
           ":gsi3sk": "MESSAGE#",
         },
         ScanIndexForward: false,

@@ -25,9 +25,9 @@ export class UserOperations {
     };
 
     const item = {
-      PK: `TEAM#\${user.team_id}`,
-      SK: `USER#\${user.id}`,
-      GSI1PK: `USER#\${user.id}`,
+      PK: `TEAM#${user.team_id}`,
+      SK: `USER#${user.id}`,
+      GSI1PK: `USER#${user.id}`,
       GSI1SK: "#METADATA",
       ItemType: "USER",
       ...user,
@@ -50,7 +50,7 @@ export class UserOperations {
         IndexName: "GSI1",
         KeyConditionExpression: "GSI1PK = :gsi1pk",
         ExpressionAttributeValues: {
-          ":gsi1pk": `USER#\${userId}`,
+          ":gsi1pk": `USER#${userId}`,
         },
       })
     );
@@ -67,7 +67,7 @@ export class UserOperations {
         TableName: TABLE_NAME,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
         ExpressionAttributeValues: {
-          ":pk": `TEAM#\${teamId}`,
+          ":pk": `TEAM#${teamId}`,
           ":sk": "USER#",
         },
       })
@@ -93,19 +93,19 @@ export class UserOperations {
     updates.updated_at = getCurrentTimestamp();
 
     for (const [key, value] of Object.entries(updates)) {
-      updateExpression.push(`#\${key} = :\${key}`);
-      expressionAttributeNames[`#\${key}`] = key;
-      expressionAttributeValues[`:\${key}`] = value;
+      updateExpression.push(`#${key} = :${key}`);
+      expressionAttributeNames[`#${key}`] = key;
+      expressionAttributeValues[`:${key}`] = value;
     }
 
     const result = await docClient.send(
       new UpdateCommand({
         TableName: TABLE_NAME,
         Key: {
-          PK: `TEAM#\${teamId}`,
-          SK: `USER#\${userId}`,
+          PK: `TEAM#${teamId}`,
+          SK: `USER#${userId}`,
         },
-        UpdateExpression: `SET \${updateExpression.join(', ')}`,
+        UpdateExpression: `SET ${updateExpression.join(", ")}`,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
         ReturnValues: "ALL_NEW",
@@ -121,8 +121,8 @@ export class UserOperations {
       new DeleteCommand({
         TableName: TABLE_NAME,
         Key: {
-          PK: `TEAM#\${teamId}`,
-          SK: `USER#\${userId}`,
+          PK: `TEAM#${teamId}`,
+          SK: `USER#${userId}`,
         },
       })
     );
