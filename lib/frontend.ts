@@ -6,7 +6,6 @@ export interface FrontendResourcesProps {
   removalPolicy?: cdk.RemovalPolicy; // defaults to DESTROY
   publicApi: cdk.aws_apigateway.RestApi;
   photoBucket: cdk.aws_s3.Bucket;
-  promptBucket: cdk.aws_s3.Bucket;
 }
 
 export class FrontendResources extends Construct {

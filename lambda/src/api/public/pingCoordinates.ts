@@ -75,7 +75,7 @@ export const handler = async (
         details:
           error instanceof Error
             ? error.message
-            : "Error caught without message in top level catch",
+            : "Error caught in pingCoordinates lambda in top level catch",
       } as ResponseError),
     };
   }

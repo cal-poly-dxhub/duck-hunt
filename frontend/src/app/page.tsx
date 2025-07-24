@@ -19,7 +19,6 @@ import { IconSend, IconTrash, IconUpload } from "@tabler/icons-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { v4 } from "uuid";
-// import Markdown from "react-markdown";
 
 const blinkAnimation = `
   @keyframes blink {
@@ -80,14 +79,14 @@ export default function Chat() {
 
     const newUserMessage: Message<MessageRole.User> = {
       id: messages.length + 1,
-      content: `$ ${userMessage}`,
+      content: userMessage,
       role: MessageRole.User,
       createdAt: new Date(),
     };
 
     const loadingMessage: Message<MessageRole.Assistant> = {
       id: messages.length + 2,
-      content: "> Loading",
+      content: "Loading",
       role: MessageRole.Assistant,
       createdAt: new Date(),
     };
@@ -102,7 +101,7 @@ export default function Chat() {
 
     const systemMessage: Message = {
       id: messages.length + 2,
-      content: `> ${message.content}`,
+      content: message.content,
       role: MessageRole.Assistant,
       createdAt: new Date(),
     };
@@ -150,7 +149,7 @@ export default function Chat() {
 
       const message = {
         id: 1,
-        content: `> Added to team: ${teamIdFromUrl}`,
+        content: `Added to team: ${teamIdFromUrl}`,
         role: MessageRole.Assistant,
         createdAt: new Date(),
       };
@@ -172,7 +171,7 @@ export default function Chat() {
 
       const message = {
         id: 1,
-        content: "> Error: No team ID provided in URL or GameProvider.",
+        content: "Error: No team ID provided in URL or GameProvider.",
         role: MessageRole.Assistant,
         createdAt: new Date(),
       };
@@ -189,7 +188,7 @@ export default function Chat() {
 
       const systemMessage = {
         id: messages.length + 1,
-        content: `> You are at level: ${data.currentLevel}.`,
+        content: `You are at level: ${data.currentLevel}.`,
         role: MessageRole.Assistant,
         createdAt: new Date(),
       };
@@ -322,7 +321,7 @@ export default function Chat() {
                 >
                   {isLoadingMessage ? (
                     <span>
-                      {"> Loading"}
+                      {"Loading"}
                       <span
                         style={{
                           display: "inline-block",
@@ -357,7 +356,6 @@ export default function Chat() {
                       </span>
                     </span>
                   ) : (
-                    // <Markdown>{displayText}</Markdown>
                     displayText
                   )}
                   {message.role === MessageRole.Assistant &&
@@ -412,7 +410,7 @@ export default function Chat() {
             variant="subtle"
             color="green"
             onClick={() => handleSend(input)}
-            disabled={loading}
+            disabled={loading || input.trim() === ""}
             aria-label="Send command"
           >
             <IconSend size="1.1rem" />

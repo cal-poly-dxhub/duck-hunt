@@ -135,8 +135,9 @@ export async function apiRequest<T = unknown>(
       status: 500,
       error: {
         error: errorMessage,
-        displayMessage: "An unexpected error occurred. Please try again later.",
-        details: "Error caught without message in top level catch",
+        displayMessage:
+          "An unexpected error occurred. Please check your internet connection and refresh the page.",
+        details: "Error caught in apiRequest top level catch",
       },
     };
   }

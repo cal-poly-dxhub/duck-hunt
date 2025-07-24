@@ -57,7 +57,7 @@ export interface LevelRequestBody {
 // response body schema for /level
 export interface LevelResponseBody {
   currentLevel: string;
-  messageHistory: Message[];
+  message: Message<MessageRole.Assistant>;
   requiresPhoto: boolean;
 }
 

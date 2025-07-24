@@ -42,7 +42,10 @@ const message = async (
       message: {
         id: userMessage.id + 1,
         role: MessageRole.Assistant,
-        content: "Failed to send message. Please try again or contact support.",
+        content:
+          typeof (error as { message?: string })?.message === "string"
+            ? (error as { message: string }).message
+            : "Failed to send message. Please try again or contact support.",
         createdAt: new Date(),
       },
       mapLink: null,
@@ -80,9 +83,11 @@ const level = async (levelId: string | null): Promise<LevelResponseBody> => {
       currentLevel: "00000000-0000-0000-0000-000000000000",
       messageHistory: [
         {
-          id: 1,
+          id: 2,
           content:
-            "Failed to retrieve level data. Please try later or contact support.",
+            typeof (error as { message?: string })?.message === "string"
+              ? (error as { message: string }).message
+              : "Failed to retrieve level data. Please try later or contact support.",
           role: MessageRole.Assistant,
           createdAt: new Date(),
         },
@@ -111,7 +116,10 @@ const clearChat = async (): Promise<MessageResponseBody> => {
       message: {
         id: 1,
         role: MessageRole.Assistant,
-        content: "Failed to clear chat. Please try again or contact support.",
+        content:
+          typeof (error as { message?: string })?.message === "string"
+            ? (error as { message: string }).message
+            : "Failed to clear chat. Please try again or contact support.",
         createdAt: new Date(),
       },
       mapLink: null,
@@ -174,6 +182,7 @@ const uploadTeamPhoto = async (file: File) => {
     const teamId = localStorage.getItem("teamId");
     const userId = localStorage.getItem("userId");
 
+    // handle manually - not using apiRequest
     if (!validateUUID(userId)) {
       console.error("User ID not valid");
       throw new Error("User ID not valid. Try clearing your browser cookies.");
@@ -208,14 +217,13 @@ const uploadTeamPhoto = async (file: File) => {
     };
   } catch (error) {
     console.error("Error in uploadTeamPhoto function:", error);
-    if ((error as { status?: number }).status === 500) {
-      return { success: false, error: "Failed to upload photo" };
-    } else {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
+    return {
+      success: false,
+      error:
+        typeof (error as { message?: string })?.message === "string"
+          ? (error as { message: string }).message
+          : "Error uploading photo. Try refreshing the page or contact support.",
+    };
   }
 };
 

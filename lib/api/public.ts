@@ -6,7 +6,6 @@ export interface PublicApiResourcesProps {
   removalPolicy?: cdk.RemovalPolicy;
   scavengerHuntTable: cdk.aws_dynamodb.Table;
   photoBucket: cdk.aws_s3.Bucket;
-  promptBucket: cdk.aws_s3.Bucket;
 }
 
 export class PublicApiResources extends Construct {
@@ -53,7 +52,6 @@ export class PublicApiResources extends Construct {
         handler: "message.handler",
         environment: {
           SCAVENGER_HUNT_TABLE: props.scavengerHuntTable.tableName,
-          PROMPT_BUCKET: props.promptBucket.bucketName,
         },
         logGroup: new cdk.aws_logs.LogGroup(this, "MessageLogGroup", {
           logGroupName: `/aws/lambda/${stack.stackName}-MessageLambda`,
@@ -73,7 +71,6 @@ export class PublicApiResources extends Construct {
         handler: "level.handler",
         environment: {
           SCAVENGER_HUNT_TABLE: props.scavengerHuntTable.tableName,
-          PROMPT_BUCKET: props.promptBucket.bucketName,
         },
         logGroup: new cdk.aws_logs.LogGroup(this, "LevelLogGroup", {
           logGroupName: `/aws/lambda/${stack.stackName}-LevelLambda`,
@@ -93,7 +90,6 @@ export class PublicApiResources extends Construct {
         handler: "clearChat.handler",
         environment: {
           SCAVENGER_HUNT_TABLE: props.scavengerHuntTable.tableName,
-          PROMPT_BUCKET: props.promptBucket.bucketName,
         },
         logGroup: new cdk.aws_logs.LogGroup(this, "ClearChatLogGroup", {
           logGroupName: `/aws/lambda/${stack.stackName}-ClearChatLambda`,
