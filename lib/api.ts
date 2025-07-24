@@ -1,24 +1,24 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 
-export interface PublicApiResourcesProps {
+export interface ApiResourcesProps {
   uniqueId: string;
   removalPolicy?: cdk.RemovalPolicy;
-  scavengerHuntTable: cdk.aws_dynamodb.Table;
+  duckHuntTable: cdk.aws_dynamodb.Table;
   photoBucket: cdk.aws_s3.Bucket;
 }
 
-export class PublicApiResources extends Construct {
-  public readonly publicApi: cdk.aws_apigateway.RestApi;
+export class ApiResources extends Construct {
+  public readonly api: cdk.aws_apigateway.RestApi;
 
-  constructor(scope: Construct, id: string, props: PublicApiResourcesProps) {
+  constructor(scope: Construct, id: string, props: ApiResourcesProps) {
     super(scope, id);
 
     // reference stack if needed
     const stack = cdk.Stack.of(this);
 
     // api
-    this.publicApi = new cdk.aws_apigateway.RestApi(this, "PublicApi", {
+    this.api = new cdk.aws_apigateway.RestApi(this, "PublicApi", {
       description: "API for frontend public requests",
       deployOptions: {
         stageName: "prod",
@@ -38,23 +38,21 @@ export class PublicApiResources extends Construct {
       },
     });
 
-    // /api/public resource
-    const apiResource = this.publicApi.root
-      .addResource("api")
-      .addResource("public");
+    // /api resource
+    const apiResource = this.api.root.addResource("api");
 
-    // /api/public/message resource
+    // /api/message resource
     const messageResource = apiResource.addResource("message");
     const messageLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
       new cdk.aws_lambda.Function(this, "MessageLambda", {
         runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
-        code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api/public"),
+        code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api"),
         handler: "message.handler",
         environment: {
-          SCAVENGER_HUNT_TABLE: props.scavengerHuntTable.tableName,
+          DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
         },
         logGroup: new cdk.aws_logs.LogGroup(this, "MessageLogGroup", {
-          logGroupName: `/aws/lambda/${stack.stackName}-MessageLambda`,
+          logGroupName: `MessageLambdaLogGroup-${props.uniqueId}`,
           retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
           removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
         }),
@@ -62,18 +60,18 @@ export class PublicApiResources extends Construct {
     );
     messageResource.addMethod("POST", messageLambdaIntegration);
 
-    // /api/public/level resource
+    // /api/level resource
     const levelResource = apiResource.addResource("level");
     const levelLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
       new cdk.aws_lambda.Function(this, "LevelLambda", {
         runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
-        code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api/public"),
+        code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api"),
         handler: "level.handler",
         environment: {
-          SCAVENGER_HUNT_TABLE: props.scavengerHuntTable.tableName,
+          DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
         },
         logGroup: new cdk.aws_logs.LogGroup(this, "LevelLogGroup", {
-          logGroupName: `/aws/lambda/${stack.stackName}-LevelLambda`,
+          logGroupName: `LevelLambdaLogGroup-${props.uniqueId}`,
           retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
           removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
         }),
@@ -81,18 +79,18 @@ export class PublicApiResources extends Construct {
     );
     levelResource.addMethod("POST", levelLambdaIntegration);
 
-    // /api/public/clear-chat resource
+    // /api/clear-chat resource
     const clearChatResource = apiResource.addResource("clear-chat");
     const clearChatLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
       new cdk.aws_lambda.Function(this, "ClearChatLambda", {
         runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
-        code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api/public"),
+        code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api"),
         handler: "clearChat.handler",
         environment: {
-          SCAVENGER_HUNT_TABLE: props.scavengerHuntTable.tableName,
+          DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
         },
         logGroup: new cdk.aws_logs.LogGroup(this, "ClearChatLogGroup", {
-          logGroupName: `/aws/lambda/${stack.stackName}-ClearChatLambda`,
+          logGroupName: `ClearChatLambdaLogGroup-${props.uniqueId}`,
           retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
           removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
         }),
@@ -100,19 +98,19 @@ export class PublicApiResources extends Construct {
     );
     clearChatResource.addMethod("POST", clearChatLambdaIntegration);
 
-    // /api/public/ping-coordinates resource
+    // /api/ping-coordinates resource
     const pingCoordinatesResource = apiResource.addResource("ping-coordinates");
     const pingCoordinatesLambdaIntegration =
       new cdk.aws_apigateway.LambdaIntegration(
         new cdk.aws_lambda.Function(this, "PingCoordinatesLambda", {
           runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
-          code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api/public"),
+          code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api"),
           handler: "pingCoordinates.handler",
           environment: {
-            SCAVENGER_HUNT_TABLE: props.scavengerHuntTable.tableName,
+            DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
           },
           logGroup: new cdk.aws_logs.LogGroup(this, "PingCoordinatesLogGroup", {
-            logGroupName: `/aws/lambda/${stack.stackName}-PingCoordinatesLambda`,
+            logGroupName: `PingCoordinatesLambdaLogGroup-${props.uniqueId}`,
             retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
             removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
           }),
@@ -120,15 +118,15 @@ export class PublicApiResources extends Construct {
       );
     pingCoordinatesResource.addMethod("POST", pingCoordinatesLambdaIntegration);
 
-    // /api/public/upload-photo resource
+    // /api/upload-photo resource
     // const uploadPhotoResource = apiResource.addResource("upload-photo");
     // const uploadPhotoLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
     //   new cdk.aws_lambda.Function(this, "UploadPhotoLambda", {
     //     runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
-    //     code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api/public"),
+    //     code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api"),
     //     handler: "uploadPhoto.handler",
     //     environment: {
-    //       SCAVENGER_HUNT_TABLE: props.scavengerHuntTable.tableName,
+    //       DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
     //       PHOTO_BUCKET: props.photoBucket.bucketName,
     //     },
     //   })

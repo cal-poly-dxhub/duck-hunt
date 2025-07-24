@@ -1,11 +1,11 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { S3Client } from "@aws-sdk/client-s3";
-import { invokeBedrock, InvokeBedrockProps } from "@shared/invokeBedrock";
+import { invokeBedrock, InvokeBedrockProps } from "../invokeBedrock";
 import { validateUUID } from "@shared/scripts";
 import {
   corsHeaders,
-  MessageRequestBody,
-  MessageResponseBody,
+  LevelRequestBody,
+  LevelResponseBody,
   MessageRole,
   RequestHeaders,
   ResponseError,
@@ -16,11 +16,10 @@ const s3Client = new S3Client({});
 const dynamoClient = new DynamoDBClient({});
 
 /**
- * /message lambda handler
- * Handles incoming messages from users, validates headers, and returns a response.
- * If the user has not sent a message before, it returns a hardcoded assistant message.
- * If the user has sent messages, it processes the latest message and returns a response.
- * Checks the time since the user started the level and provides hint/map link if necessary.
+ * /level lambda handler
+ * Handles requests when user scans a level duck or refreshes their page after scanning a level duck.
+ * If no messages are found for the user at the current level, handler should return hardcoded assistant message.
+ * Otherwise, handler should return the not deleted message history for the user at the current level.
  * @param event
  */
 export const handler = async (
@@ -66,55 +65,29 @@ export const handler = async (
   try {
     // query dynamo for user
     // query dynamo for team
-    // query dynamo for team's current level
 
-    // check how long since they started the level
-    // if >10 min, return easy hint
-    // if >15 min, return maps link
+    const requestBody: LevelRequestBody = JSON.parse(event.body || "{}");
+
+    // query dynamo for team's current level
+    // if id matches a previous level, return nothing
+    // if id matches current level, advance to next level
+    // if id matches future level, return error
 
     // query dynamo for user's messages at this level
 
     // if latest message is from user, remove from message history
     // if messages do not alternate roles, fix
 
-    const requestBody: MessageRequestBody = JSON.parse(event.body || "{}");
-    if (!requestBody.message || !requestBody.message.content) {
-      return {
-        statusCode: 400,
-        headers: corsHeaders,
-        body: JSON.stringify({
-          error: "Invalid request body.",
-          displayMessage: "Please provide a valid message.",
-          details: "Message content is required.",
-        } as ResponseError),
-      };
-    }
-
-    // build prompt from s3
-    // invoke bedrock with prompt and user's (current level, not deleted) message history
-
-    // process bedrock response
-    // save response message to dynamo
-
-    // TODO: replace with actual message history
-    const STUBMessageHistory = [
-      {
-        id: 0,
-        role: MessageRole.User,
-        content: "Hello. Introduce yourself and your job.",
-        createdAt: new Date(),
-      },
-      {
-        id: 1,
-        role: MessageRole.Assistant,
-        content: "Hello, I am an assistant for duck hunt.",
-        createdAt: new Date(),
-      },
-    ];
+    const initialLevelMessage = {
+      id: 0,
+      role: MessageRole.User,
+      content: "Hello. Introduce yourself and your job.",
+      createdAt: new Date(),
+    };
 
     const invokeBedrockProps: InvokeBedrockProps = {
-      systemPromptId: "00000000-0000-0000-0000-000000000000",
-      messageHistory: STUBMessageHistory,
+      levelId: "00000000-0000-0000-0000-000000000000", // get from dynamo
+      messageHistory: [initialLevelMessage],
     };
     const { bedrockResponseMessage, bedrockFailed } = await invokeBedrock(
       invokeBedrockProps
@@ -126,9 +99,10 @@ export const handler = async (
     }
 
     // stub response
-    const responseBody: MessageResponseBody = {
+    const responseBody: LevelResponseBody = {
+      currentLevel: crypto.randomUUID(),
       message: bedrockResponseMessage,
-      mapLink: null,
+      requiresPhoto: true,
     };
 
     return {
@@ -147,7 +121,7 @@ export const handler = async (
         details:
           error instanceof Error
             ? error.message
-            : "Error caught in message lambda top level catch",
+            : "Error caught in level lambda top level catch",
       } as ResponseError),
     };
   }

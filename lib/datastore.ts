@@ -8,14 +8,14 @@ export interface DatastoreResourcesProps {
 }
 
 export class DatastoreResources extends Construct {
-  public readonly scavengerHuntTable: dynamodb.Table;
+  public readonly duckHuntTable: dynamodb.Table;
   public readonly photoBucket: cdk.aws_s3.Bucket;
 
   constructor(scope: Construct, id: string, props: DatastoreResourcesProps) {
     super(scope, id);
 
     // DynamoDB Table for Scavenger Hunt Data
-    this.scavengerHuntTable = new dynamodb.Table(
+    this.duckHuntTable = new dynamodb.Table(
       this,
       `ScavengerHuntData-${props.uniqueId}`,
       {
@@ -35,7 +35,7 @@ export class DatastoreResources extends Construct {
 
     // Define Global Secondary Indexes (GSIs)
     // GSI1: Primarily for lookups where GSI1PK (e.g., LEVEL#) is the partition key
-    this.scavengerHuntTable.addGlobalSecondaryIndex({
+    this.duckHuntTable.addGlobalSecondaryIndex({
       indexName: "GSI1",
       partitionKey: {
         name: "GSI1PK",
@@ -49,7 +49,7 @@ export class DatastoreResources extends Construct {
     });
 
     // GSI2: For other common access patterns not covered by PK/SK or GSI1
-    this.scavengerHuntTable.addGlobalSecondaryIndex({
+    this.duckHuntTable.addGlobalSecondaryIndex({
       indexName: "GSI2",
       partitionKey: {
         name: "GSI2PK",
@@ -63,7 +63,7 @@ export class DatastoreResources extends Construct {
     });
 
     // GSI3: For yet another set of access patterns
-    this.scavengerHuntTable.addGlobalSecondaryIndex({
+    this.duckHuntTable.addGlobalSecondaryIndex({
       indexName: "GSI3",
       partitionKey: {
         name: "GSI3PK",

@@ -81,17 +81,16 @@ const level = async (levelId: string | null): Promise<LevelResponseBody> => {
     console.error("Error in atLevel function:", error);
     return {
       currentLevel: "00000000-0000-0000-0000-000000000000",
-      messageHistory: [
-        {
-          id: 2,
-          content:
-            typeof (error as { message?: string })?.message === "string"
-              ? (error as { message: string }).message
-              : "Failed to retrieve level data. Please try later or contact support.",
-          role: MessageRole.Assistant,
-          createdAt: new Date(),
-        },
-      ],
+      message: {
+        id: 2,
+        content:
+          typeof (error as { message?: string })?.message === "string"
+            ? (error as { message: string }).message
+            : "Failed to retrieve level data. Please try later or contact support.",
+        role: MessageRole.Assistant,
+        createdAt: new Date(),
+      },
+
       requiresPhoto: false,
     };
   }

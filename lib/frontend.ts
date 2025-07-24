@@ -4,7 +4,7 @@ import { Construct } from "constructs";
 export interface FrontendResourcesProps {
   uniqueId: string;
   removalPolicy?: cdk.RemovalPolicy; // defaults to DESTROY
-  publicApi: cdk.aws_apigateway.RestApi;
+  api: cdk.aws_apigateway.RestApi;
   photoBucket: cdk.aws_s3.Bucket;
 }
 
@@ -130,7 +130,7 @@ export class FrontendResources extends Construct {
             value: cdk.Aws.REGION,
           },
           NEXT_PUBLIC_API_BASE_URL: {
-            value: props.publicApi.url + "api/public",
+            value: props.api.url + "api",
           },
         },
         buildSpec: cdk.aws_codebuild.BuildSpec.fromObject({
@@ -181,7 +181,7 @@ export class FrontendResources extends Construct {
     // ensure the build runs after the source deployment and all env vars are ready
     build.node.addDependency(sourceDeployment);
     build.node.addDependency(this.distribution);
-    build.node.addDependency(props.publicApi);
+    build.node.addDependency(props.api);
 
     // trigger codebuild project on stack creation and update
     const triggerBuild = new cdk.custom_resources.AwsCustomResource(
