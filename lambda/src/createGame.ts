@@ -1,45 +1,15 @@
 import { S3Event } from "aws-lambda";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { v4 as uuidv4, validate as validateUUID } from "uuid";
-import { GameOperations } from "./dynamo/game";
-import { TeamOperations } from "./dynamo/team";
-import { LevelOperations } from "./dynamo/level";
+import { Game, GameOperations } from "./dynamo/game";
+import { Team, TeamOperations } from "./dynamo/team";
+import { Level, LevelOperations } from "./dynamo/level";
 import { TeamLevelOperations } from "./dynamo/teamLevel";
+import { BaseEntity } from "./dynamo";
 
 const s3Client = new S3Client({});
 
-// Validation interfaces
-interface GameConfig {
-  id?: string;
-  name: string;
-  description: string;
-  teams: TeamConfig[];
-  levelsInGame?: number;
-  levels: LevelConfig[];
-}
-
-interface TeamConfig {
-  id?: string;
-  name: string;
-}
-
-interface LevelConfig {
-  id?: string;
-  levelName: string;
-  character: {
-    name: string;
-    systemPrompt: string;
-  };
-  location: {
-    description: string;
-    latitude: number;
-    longitude: number;
-  };
-  clues: string[];
-  easyClues: string[];
-  mapLink: string;
-  max_tokens: number;
-}
+// Validation interfaces - matching schema exactly
 
 interface ValidationError {
   field: string;
@@ -49,7 +19,7 @@ interface ValidationError {
 class GameConfigValidator {
   private errors: ValidationError[] = [];
 
-  validate(config: any): GameConfig {
+  validate(config: any): Omit<Game, "created_at" | "updated_at"> {
     this.errors = [];
 
     // Validate root object
@@ -57,30 +27,7 @@ class GameConfigValidator {
       throw new Error("Config must be a valid object");
     }
 
-    // Validate required fields
-    if (
-      !config.name ||
-      typeof config.name !== "string" ||
-      config.name.trim() === ""
-    ) {
-      this.addError(
-        "name",
-        "Game name is required and must be a non-empty string"
-      );
-    }
-
-    if (
-      !config.description ||
-      typeof config.description !== "string" ||
-      config.description.trim() === ""
-    ) {
-      this.addError(
-        "description",
-        "Game description is required and must be a non-empty string"
-      );
-    }
-
-    // Validate teams array
+    // Validate teams array (REQUIRED)
     if (!Array.isArray(config.teams) || config.teams.length === 0) {
       this.addError(
         "teams",
@@ -92,7 +39,7 @@ class GameConfigValidator {
       });
     }
 
-    // Validate levels array
+    // Validate levels array (REQUIRED)
     if (!Array.isArray(config.levels) || config.levels.length === 0) {
       this.addError(
         "levels",
@@ -104,7 +51,7 @@ class GameConfigValidator {
       });
     }
 
-    // Validate levelsInGame
+    // Validate levelsInGame (OPTIONAL)
     if (config.levelsInGame !== undefined) {
       if (!Number.isInteger(config.levelsInGame) || config.levelsInGame <= 0) {
         this.addError(
@@ -119,11 +66,6 @@ class GameConfigValidator {
       }
     }
 
-    // Validate optional ID
-    if (config.id && !validateUUID(config.id)) {
-      this.addError("id", "Game ID must be a valid UUIDv4");
-    }
-
     if (this.errors.length > 0) {
       throw new Error(
         `Validation failed: ${this.errors
@@ -134,13 +76,12 @@ class GameConfigValidator {
 
     // Set defaults and return validated config
     return {
-      ...config,
       id: config.id || uuidv4(),
-      levelsInGame: config.levelsInGame || config.levels.length,
       teams: config.teams.map((team: any) => ({
         ...team,
         id: team.id || uuidv4(),
       })),
+      levelsInGame: config.levelsInGame ?? config.levels.length,
       levels: config.levels.map((level: any) => ({
         ...level,
         id: level.id || uuidv4(),
@@ -156,6 +97,7 @@ class GameConfigValidator {
       return;
     }
 
+    // name is REQUIRED
     if (
       !team.name ||
       typeof team.name !== "string" ||
@@ -165,10 +107,6 @@ class GameConfigValidator {
         `${prefix}.name`,
         "Team name is required and must be a non-empty string"
       );
-    }
-
-    if (team.id && !validateUUID(team.id)) {
-      this.addError(`${prefix}.id`, "Team ID must be a valid UUIDv4");
     }
   }
 
@@ -180,7 +118,7 @@ class GameConfigValidator {
       return;
     }
 
-    // Validate required string fields
+    // levelName is REQUIRED
     if (
       !level.levelName ||
       typeof level.levelName !== "string" ||
@@ -192,6 +130,7 @@ class GameConfigValidator {
       );
     }
 
+    // mapLink is REQUIRED
     if (
       !level.mapLink ||
       typeof level.mapLink !== "string" ||
@@ -203,7 +142,7 @@ class GameConfigValidator {
       );
     }
 
-    // Validate max_tokens
+    // max_tokens is REQUIRED and must be positive integer
     if (!Number.isInteger(level.max_tokens) || level.max_tokens <= 0) {
       this.addError(
         `${prefix}.max_tokens`,
@@ -211,10 +150,11 @@ class GameConfigValidator {
       );
     }
 
-    // Validate character object
+    // character object is REQUIRED
     if (!level.character || typeof level.character !== "object") {
       this.addError(`${prefix}.character`, "Character object is required");
     } else {
+      // character.name is REQUIRED
       if (
         !level.character.name ||
         typeof level.character.name !== "string" ||
@@ -225,6 +165,8 @@ class GameConfigValidator {
           "Character name is required and must be a non-empty string"
         );
       }
+
+      // character.systemPrompt is REQUIRED
       if (
         !level.character.systemPrompt ||
         typeof level.character.systemPrompt !== "string" ||
@@ -237,10 +179,11 @@ class GameConfigValidator {
       }
     }
 
-    // Validate location object
+    // location object is REQUIRED
     if (!level.location || typeof level.location !== "object") {
       this.addError(`${prefix}.location`, "Location object is required");
     } else {
+      // location.description is REQUIRED
       if (
         !level.location.description ||
         typeof level.location.description !== "string" ||
@@ -251,6 +194,8 @@ class GameConfigValidator {
           "Location description is required and must be a non-empty string"
         );
       }
+
+      // location.latitude is REQUIRED and must be valid range
       if (
         typeof level.location.latitude !== "number" ||
         level.location.latitude < -90 ||
@@ -261,6 +206,8 @@ class GameConfigValidator {
           "Latitude must be a number between -90 and 90"
         );
       }
+
+      // location.longitude is REQUIRED and must be valid range
       if (
         typeof level.location.longitude !== "number" ||
         level.location.longitude < -180 ||
@@ -273,7 +220,7 @@ class GameConfigValidator {
       }
     }
 
-    // Validate clues array
+    // clues array is REQUIRED with at least 3 elements
     if (!Array.isArray(level.clues) || level.clues.length < 3) {
       this.addError(
         `${prefix}.clues`,
@@ -290,7 +237,7 @@ class GameConfigValidator {
       });
     }
 
-    // Validate easyClues array
+    // easyClues array is REQUIRED with at least 2 elements
     if (!Array.isArray(level.easyClues) || level.easyClues.length < 2) {
       this.addError(
         `${prefix}.easyClues`,
@@ -305,11 +252,6 @@ class GameConfigValidator {
           );
         }
       });
-    }
-
-    // Validate optional ID
-    if (level.id && !validateUUID(level.id)) {
-      this.addError(`${prefix}.id`, "Level ID must be a valid UUIDv4");
     }
   }
 
@@ -330,11 +272,11 @@ class GameCreationService {
     const validatedConfig = this.validator.validate(config);
     console.log("INFO: Configuration validated successfully");
 
-    // Create the game
+    // Create the game - only with levelsInGame field according to DynamoDB schema
     const game = await GameOperations.create({
-      name: validatedConfig.name,
-      description: validatedConfig.description,
-      levelsInGame: validatedConfig.levelsInGame,
+      ...validatedConfig,
+      levelsInGame:
+        validatedConfig.levelsInGame ?? validatedConfig.levels.length,
     });
     console.log(`INFO: Created game with ID: ${game.id}`);
 
@@ -361,7 +303,6 @@ class GameCreationService {
         TeamOperations.create({
           name: teamConfig.name,
           game_id: game.id,
-          difficulty_level: "normal", // Default difficulty
         })
       )
     );
@@ -376,13 +317,13 @@ class GameCreationService {
 
     return {
       gameId: game.id,
-      message: `Successfully created game "${game.name}" with ${createdTeams.length} teams and ${createdLevels.length} levels`,
+      message: `Successfully created game with ${createdTeams.length} teams and ${createdLevels.length} levels`,
     };
   }
 
   private async createTeamLevelAssignments(
-    teams: any[],
-    levels: any[],
+    teams: Team[],
+    levels: Level[],
     levelsInGame: number
   ): Promise<void> {
     console.log("INFO: Creating team-level assignments");
@@ -456,7 +397,6 @@ export const handler = async (event: S3Event) => {
       });
 
       const s3Response = await s3Client.send(getObjectCommand);
-
       if (!s3Response.Body) {
         throw new Error(`No content found in S3 object: ${key}`);
       }

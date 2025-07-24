@@ -16,7 +16,6 @@ import { v4 as uuidv4 } from "uuid";
 export interface Team extends BaseEntity {
   name: string;
   game_id: string;
-  difficulty_level: string;
 }
 
 // TEAM Operations

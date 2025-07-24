@@ -1,6 +1,4 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
-  DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
   UpdateCommand,
@@ -13,11 +11,13 @@ import {
   getCurrentTimestamp,
   DUCK_HUNT_TABLE_NAME,
 } from ".";
+import { Team } from "./team";
+import { Level } from "./level";
 
 export interface Game extends BaseEntity {
-  name: string;
-  description: string;
   levelsInGame?: number;
+  teams: Array<Team>;
+  levels: Array<Level>;
 }
 
 // GAME Operations

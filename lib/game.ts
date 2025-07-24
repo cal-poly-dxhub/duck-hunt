@@ -43,6 +43,11 @@ export class GameResources extends Construct {
           DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
           GAME_CONFIG_BUCKET_NAME: this.gameConfigBucket.bucketName,
         },
+        logGroup: new cdk.aws_logs.LogGroup(this, "CreateGameLambdaLogGroup", {
+          logGroupName: `CreateGameLambdaLogGroup-${props.uniqueId}`,
+          retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
+          removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
+        }),
       }
     );
 

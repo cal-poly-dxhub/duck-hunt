@@ -83,6 +83,26 @@ export class LevelOperations {
     return level as Level;
   }
 
+  // New method to get level by ID alone using GSI1
+  static async getByLevelId(levelId: string): Promise<Level | null> {
+    const result = await docClient.send(
+      new QueryCommand({
+        TableName: DUCK_HUNT_TABLE_NAME,
+        IndexName: "GSI1",
+        KeyConditionExpression: "GSI1PK = :gsi1pk",
+        ExpressionAttributeValues: {
+          ":gsi1pk": `LEVEL#\${levelId}`,
+        },
+        Limit: 1,
+      })
+    );
+
+    if (!result.Items || result.Items.length === 0) return null;
+
+    const { PK, SK, GSI1PK, GSI1SK, ItemType, ...level } = result.Items[0];
+    return level as Level;
+  }
+
   static async getByGameId(gameId: string): Promise<Level[]> {
     const result = await docClient.send(
       new QueryCommand({
