@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "license": "MIT",
   "scripts": {
-    "build": "esbuild src/api/public/message.ts --bundle --platform=node --target=node22 --outdir=dist --outbase=src && cp src/frontend-rewrite.js dist/frontend-rewrite.js"
+    "build": "esbuild src/**/*.ts --bundle --platform=node --target=node22 --outdir=dist --outbase=src && cp src/frontend-rewrite.js dist/frontend-rewrite.js"
   },
   "dependencies": {
     "@aws-sdk/client-textract": "^3.840.0",

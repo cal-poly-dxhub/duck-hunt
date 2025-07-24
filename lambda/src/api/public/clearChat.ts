@@ -3,7 +3,6 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { validateUUID } from "@shared/scripts";
 import {
   corsHeaders,
-  MessageRequestBody,
   MessageResponseBody,
   MessageRole,
   RequestHeaders,
@@ -15,11 +14,10 @@ const s3Client = new S3Client({});
 const dynamoClient = new DynamoDBClient({});
 
 /**
- * /message lambda handler
- * Handles incoming messages from users, validates headers, and returns a response.
- * If the user has not sent a message before, it returns a hardcoded assistant message.
- * If the user has sent messages, it processes the latest message and returns a response.
- * Checks the time since the user started the level and provides hint/map link if necessary.
+ * /clear-chat lambda handler
+ * Handles requests when the user clears the chat.
+ * Soft deletes all messages for the user at the current level.
+ * Returns the hardcoded initial message for the level.
  * @param event
  */
 export const handler = async (
@@ -76,33 +74,15 @@ export const handler = async (
     // if latest message is from user, remove from message history
     // if messages do not alternate roles, fix
 
-    const requestBody: MessageRequestBody = JSON.parse(event.body || "{}");
-    if (!requestBody.message || !requestBody.message.content) {
-      return {
-        statusCode: 400,
-        headers: corsHeaders,
-        body: JSON.stringify({
-          error: "Invalid request body.",
-          displayMessage: "Please provide a valid message.",
-          details: "Message content is required.",
-        } as ResponseError),
-      };
-    }
-
-    // build prompt from s3
-    // invoke bedrock with prompt and user's (current level, not deleted) message history
-
-    // process bedrock response
-    // save response message to dynamo
+    // soft delete all messages for the user at the current level
+    // fetch and return the hardcoded initial message for the level
 
     // stub response
     const responseBody: MessageResponseBody = {
       message: {
-        id: requestBody.message.id + 1,
+        id: 1,
         role: MessageRole.Assistant,
-        content:
-          "This is a stub response for /message endpoint. You said: " +
-          requestBody.message.content,
+        content: "This is a stub response for /clearChat endpoint.",
         createdAt: new Date(),
       },
       mapLink: null,

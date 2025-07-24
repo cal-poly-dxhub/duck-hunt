@@ -2,7 +2,6 @@
 
 import { scavengerHuntApi } from "@/api/scavengerHuntApi";
 import { useGame } from "@/constants/GameProvider";
-import { Message } from "@/constants/types";
 import {
   ActionIcon,
   Box,
@@ -15,9 +14,11 @@ import {
   TextInput,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
+import { Message, MessageRole } from "@shared/types";
 import { IconSend, IconTrash, IconUpload } from "@tabler/icons-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { v4 } from "uuid";
 // import Markdown from "react-markdown";
 
 const blinkAnimation = `
@@ -38,6 +39,8 @@ export default function Chat() {
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
+  // TODO:
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [typingMessages, setTypingMessages] = useState<Record<number, string>>(
     {}
   );
@@ -52,83 +55,61 @@ export default function Chat() {
     isLoading: gameLoading,
   } = useGame();
 
-  const typeMessage = async (messageId: number, fullText: string) => {
-    for (let i = 0; i <= fullText.length; i++) {
+  const typeMessage = async (message: Message) => {
+    for (let i = 0; i <= message.content.length; i++) {
       setTypingMessages((prev) => ({
         ...prev,
-        [messageId]: fullText.slice(0, i),
+        [message.id]: message.content.slice(0, i),
       }));
-      if (i < fullText.length) {
+      if (i < message.content.length) {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
     }
     setTypingMessages((prev) => {
       const newState = { ...prev };
-      delete newState[messageId];
+      delete newState[message.id];
       return newState;
     });
   };
 
-  const handleSend = async (prompt: string) => {
-    if (prompt.trim() === "") return;
+  const handleSend = async (userMessage: string) => {
+    if (userMessage.trim() === "") return;
 
     setLoading(true);
     setInput("");
 
-    const userMessage: Message = {
+    const newUserMessage: Message<MessageRole.User> = {
       id: messages.length + 1,
-      text: `$ ${prompt}`,
-      sender: "user",
-      timestamp: new Date(),
+      content: `$ ${userMessage}`,
+      role: MessageRole.User,
+      createdAt: new Date(),
     };
 
-    const loadingMessage: Message = {
+    const loadingMessage: Message<MessageRole.Assistant> = {
       id: messages.length + 2,
-      text: "> Loading",
-      sender: "system",
-      timestamp: new Date(),
+      content: "> Loading",
+      role: MessageRole.Assistant,
+      createdAt: new Date(),
     };
 
-    setMessages([...messages, userMessage, loadingMessage]);
+    setMessages([...messages, newUserMessage, loadingMessage]);
 
-    try {
-      const data = await scavengerHuntApi.message(prompt);
-
-      if (data.status === 406) {
-        setNeedsTeamPhoto(true);
-        // revert to previous messages
-        setMessages((prev) => prev.slice(0, -2));
-        return;
-      }
-
-      if (!data.success) {
-        throw new Error(data.error || "Unknown error");
-      }
-
-      const systemMessage: Message = {
-        id: messages.length + 2,
-        text: `> ${data.message}`,
-        sender: "system",
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev.slice(0, -1), systemMessage]);
-      typeMessage(systemMessage.id, systemMessage.text);
-    } catch (error) {
-      console.error("Error sending message:", error);
-      const errorMessage: Message = {
-        id: messages.length + 2,
-        text: `> Error: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
-        sender: "system",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev.slice(0, -1), errorMessage]);
-      typeMessage(errorMessage.id, errorMessage.text);
-    } finally {
-      setLoading(false);
+    const { mapLink, message } = await scavengerHuntApi.message(newUserMessage);
+    if (mapLink !== null) {
+      // if map link is not null, open it in a new tab
+      window.open(mapLink, "_blank");
     }
+
+    const systemMessage: Message = {
+      id: messages.length + 2,
+      content: `> ${message.content}`,
+      role: MessageRole.Assistant,
+      createdAt: new Date(),
+    };
+
+    setMessages((prev) => [...prev.slice(0, -1), systemMessage]);
+    typeMessage(systemMessage);
+    setLoading(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -138,9 +119,9 @@ export default function Chat() {
     }
   };
 
-  const handleClearChat = () => {
-    scavengerHuntApi.clearChat();
-    setMessages([]);
+  const handleClearChat = async () => {
+    const { message } = await scavengerHuntApi.clearChat();
+    setMessages([message]);
     setTypingMessages({});
   };
 
@@ -156,7 +137,7 @@ export default function Chat() {
     }
 
     if (!userId) {
-      const newUserId = crypto.randomUUID();
+      const newUserId = v4();
       console.warn("No userId found in GameProvider. Generating a new one.");
       setUserId(newUserId);
     }
@@ -169,13 +150,13 @@ export default function Chat() {
 
       const message = {
         id: 1,
-        text: `> Team ID set to: ${teamIdFromUrl}`,
-        sender: "system" as const,
-        timestamp: new Date(),
+        content: `> Added to team: ${teamIdFromUrl}`,
+        role: MessageRole.Assistant,
+        createdAt: new Date(),
       };
 
       setMessages([message]);
-      typeMessage(message.id, message.text);
+      typeMessage(message);
     }
   }, [teamIdFromUrl, teamId, setTeamId, gameLoading, userId, setUserId]);
 
@@ -188,87 +169,40 @@ export default function Chat() {
       console.error(
         "No teamId found in GameProvider. Please ensure you have set a team ID."
       );
+
       const message = {
         id: 1,
-        text: "> Error: No team ID provided in URL or GameProvider.",
-        sender: "system" as const,
-        timestamp: new Date(),
+        content: "> Error: No team ID provided in URL or GameProvider.",
+        role: MessageRole.Assistant,
+        createdAt: new Date(),
       };
 
       setMessages([message]);
-      typeMessage(message.id, message.text);
+      typeMessage(message);
     }
   }, [teamId, teamIdFromUrl, gameLoading]);
 
-  // end sequence or at level
+  // /level
   useEffect(() => {
     const handleCheckLocation = async () => {
-      if (endSequenceFromUrl) {
-        const data = await scavengerHuntApi.finishGame(endSequenceFromUrl);
-        if (!data.success) {
-          console.error("Error finishing game:", data.error);
-          const errorMessage = {
-            id: messages.length + 1,
-            text: `> Error finishing game: ${data.error || "Unknown error"}`,
-            sender: "system" as const,
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, errorMessage]);
-          typeMessage(errorMessage.id, errorMessage.text);
-        } else {
-          const successMessage = {
-            id: messages.length + 1,
-            text: `> ${data.message}`,
-            sender: "system" as const,
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, successMessage]);
-          typeMessage(successMessage.id, successMessage.text);
+      const data = await scavengerHuntApi.level(levelIdFromUrl);
 
-          return;
-        }
-      }
+      const systemMessage = {
+        id: messages.length + 1,
+        content: `> You are at level: ${data.currentLevel}.`,
+        role: MessageRole.Assistant,
+        createdAt: new Date(),
+      };
 
-      try {
-        const data = await scavengerHuntApi.atLevel(
-          levelIdFromUrl ?? "current"
-        );
-
-        if (!data.success) {
-          throw new Error("Unknown error");
-        }
-
-        const systemMessage: Message = {
-          id: messages.length + 1,
-          text: `> You are at level: ${data.level}.`,
-          sender: "system",
-          timestamp: new Date(),
-        };
-
-        setMessages([
-          systemMessage,
-          ...((data?.messageHistory as unknown as Message[]) ?? []),
-        ]);
-        typeMessage(systemMessage.id, systemMessage.text);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error checking location:", error);
-        const errorMessage: Message = {
-          id: messages.length + 1,
-          text: `> Error: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
-          sender: "system",
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, errorMessage]);
-        typeMessage(errorMessage.id, errorMessage.text);
-      }
+      setMessages([systemMessage, ...(data?.messageHistory ?? [])]);
+      typeMessage(systemMessage);
+      setLoading(false);
     };
 
     if (teamId && userId) {
       handleCheckLocation();
     }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, teamId, levelIdFromUrl, endSequenceFromUrl]);
 
@@ -324,15 +258,8 @@ export default function Chat() {
                   const result = await scavengerHuntApi.uploadTeamPhoto(file);
                   if (result.success) {
                     setNeedsTeamPhoto(false);
-                    const successMessage: Message = {
-                      id: messages.length + 1,
-                      text: `> ${result.message}`,
-                      sender: "system",
-                      timestamp: new Date(),
-                    };
-                    setMessages((prev) => [...prev, successMessage]);
-                    typeMessage(successMessage.id, successMessage.text);
                   } else {
+                    // TODO: better error handling
                     alert(`Error: ${result.error}`);
                   }
                 } catch (error) {
@@ -376,12 +303,12 @@ export default function Chat() {
           <Stack gap="xs">
             {messages.map((message) => {
               const displayText =
-                message.sender === "system" &&
-                typingMessages[message.id] !== undefined
-                  ? typingMessages[message.id]
-                  : message.text;
+                message.role === MessageRole.Assistant
+                  ? "> " + message.content
+                  : "$ " + message.content;
 
-              const isLoadingMessage = message.text === "> Loading" && loading;
+              const isLoadingMessage =
+                message.content === "> Loading" && loading;
 
               return (
                 <Text
@@ -433,20 +360,21 @@ export default function Chat() {
                     // <Markdown>{displayText}</Markdown>
                     displayText
                   )}
-                  {message.sender === "system" && !isLoadingMessage && (
-                    <Box
-                      component="span"
-                      style={{
-                        display: "inline-block",
-                        width: "0.5rem",
-                        height: "1rem",
-                        backgroundColor: "var(--mantine-color-green-5)",
-                        animation: `${blinkAnimation} 1s infinite`,
-                        verticalAlign: "middle",
-                        marginLeft: "0.25rem",
-                      }}
-                    />
-                  )}
+                  {message.role === MessageRole.Assistant &&
+                    !isLoadingMessage && (
+                      <Box
+                        component="span"
+                        style={{
+                          display: "inline-block",
+                          width: "0.5rem",
+                          height: "1rem",
+                          backgroundColor: "var(--mantine-color-green-5)",
+                          animation: `${blinkAnimation} 1s infinite`,
+                          verticalAlign: "middle",
+                          marginLeft: "0.25rem",
+                        }}
+                      />
+                    )}
                 </Text>
               );
             })}
