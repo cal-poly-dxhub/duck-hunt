@@ -1,4 +1,9 @@
-import { BaseEntity, docClient, getCurrentTimestamp, TABLE_NAME } from ".";
+import {
+  BaseEntity,
+  docClient,
+  getCurrentTimestamp,
+  DUCK_HUNT_TABLE_NAME,
+} from ".";
 import {
   GetCommand,
   PutCommand,
@@ -27,15 +32,15 @@ export class TeamOperations {
     };
 
     const item = {
-      PK: `GAME#\${team.game_id}`,
-      SK: `TEAM#\${team.id}`,
+      PK: `GAME#${team.game_id}`,
+      SK: `TEAM#${team.id}`,
       ItemType: "TEAM",
       ...team,
     };
 
     await docClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Item: item,
       })
     );
@@ -46,10 +51,10 @@ export class TeamOperations {
   static async getById(gameId: string, teamId: string): Promise<Team | null> {
     const result = await docClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
-          SK: `TEAM#\${teamId}`,
+          PK: `GAME#${gameId}`,
+          SK: `TEAM#${teamId}`,
         },
       })
     );
@@ -63,10 +68,10 @@ export class TeamOperations {
   static async getByGameId(gameId: string): Promise<Team[]> {
     const result = await docClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
         ExpressionAttributeValues: {
-          ":pk": `GAME#\${gameId}`,
+          ":pk": `GAME#${gameId}`,
           ":sk": "TEAM#",
         },
       })
@@ -92,19 +97,19 @@ export class TeamOperations {
     updates.updated_at = getCurrentTimestamp();
 
     for (const [key, value] of Object.entries(updates)) {
-      updateExpression.push(`#\${key} = :\${key}`);
-      expressionAttributeNames[`#\${key}`] = key;
-      expressionAttributeValues[`:\${key}`] = value;
+      updateExpression.push(`#${key} = :${key}`);
+      expressionAttributeNames[`#${key}`] = key;
+      expressionAttributeValues[`:${key}`] = value;
     }
 
     const result = await docClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
-          SK: `TEAM#\${teamId}`,
+          PK: `GAME#${gameId}`,
+          SK: `TEAM#${teamId}`,
         },
-        UpdateExpression: `SET \${updateExpression.join(', ')}`,
+        UpdateExpression: `SET ${updateExpression.join(", ")}`,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
         ReturnValues: "ALL_NEW",
@@ -118,10 +123,10 @@ export class TeamOperations {
   static async delete(gameId: string, teamId: string): Promise<void> {
     await docClient.send(
       new DeleteCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
-          SK: `TEAM#\${teamId}`,
+          PK: `GAME#${gameId}`,
+          SK: `TEAM#${teamId}`,
         },
       })
     );

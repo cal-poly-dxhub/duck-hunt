@@ -6,6 +6,8 @@
     "build": "tsc && cp src/frontend-rewrite.js dist/frontend-rewrite.js"
   },
   "devDependencies": {
-    "@aws-sdk/lib-dynamodb": "^3.850.0"
+    "@aws-sdk/lib-dynamodb": "^3.850.0",
+    "@aws-sdk/lib-storage": "^3.850.0",
+    "@aws-sdk/s3-request-presigner": "^3.850.0"
   }
 }

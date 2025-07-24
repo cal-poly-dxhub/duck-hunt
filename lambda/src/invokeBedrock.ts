@@ -1,6 +1,6 @@
 // TODO
 
-import { Message, MessageRole, UUID } from "../../shared/src/types";
+import { Message, MessageRole, UUID } from "@shared/types";
 
 export interface InvokeBedrockProps {
   levelId: UUID;

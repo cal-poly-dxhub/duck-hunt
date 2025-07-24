@@ -3,9 +3,6 @@
 # exit on error
 set -e
 
-# build lambdas
-cd lambda && yarn install && yarn build && cd ..
-
 # package frontend source excluding all compiled JS/TS files, build artifacts, and other temporary files
 zip -r frontend.zip frontend/ -x \
   "frontend/node_modules/*" \

@@ -1,4 +1,5 @@
 import * as cdk from "aws-cdk-lib";
+import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
 
 export interface ApiResourcesProps {
@@ -43,94 +44,131 @@ export class ApiResources extends Construct {
 
     // /api/message resource
     const messageResource = apiResource.addResource("message");
+    const messageLambda = new NodejsFunction(this, "MessageLambda", {
+      runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
+      entry: "lambda/src/api/message.ts",
+      handler: "handler",
+      bundling: {
+        externalModules: ["@aws-sdk/*"],
+        nodeModules: [],
+      },
+      environment: {
+        DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
+      },
+      logGroup: new cdk.aws_logs.LogGroup(this, "MessageLogGroup", {
+        logGroupName: `MessageLambdaLogGroup-${props.uniqueId}`,
+        retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
+        removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+    props.duckHuntTable.grantReadWriteData(messageLambda);
     const messageLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
-      new cdk.aws_lambda.Function(this, "MessageLambda", {
-        runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
-        code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api"),
-        handler: "message.handler",
-        environment: {
-          DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
-        },
-        logGroup: new cdk.aws_logs.LogGroup(this, "MessageLogGroup", {
-          logGroupName: `MessageLambdaLogGroup-${props.uniqueId}`,
-          retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
-          removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
-        }),
-      })
+      messageLambda
     );
     messageResource.addMethod("POST", messageLambdaIntegration);
 
     // /api/level resource
     const levelResource = apiResource.addResource("level");
+    const levelLambda = new NodejsFunction(this, "LevelLambda", {
+      runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
+      entry: "lambda/src/api/level.ts",
+      handler: "handler",
+      bundling: {
+        externalModules: ["@aws-sdk/*"],
+        nodeModules: [],
+      },
+      environment: {
+        DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
+      },
+      logGroup: new cdk.aws_logs.LogGroup(this, "LevelLogGroup", {
+        logGroupName: `LevelLambdaLogGroup-${props.uniqueId}`,
+        retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
+        removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+    props.duckHuntTable.grantReadWriteData(levelLambda);
     const levelLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
-      new cdk.aws_lambda.Function(this, "LevelLambda", {
-        runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
-        code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api"),
-        handler: "level.handler",
-        environment: {
-          DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
-        },
-        logGroup: new cdk.aws_logs.LogGroup(this, "LevelLogGroup", {
-          logGroupName: `LevelLambdaLogGroup-${props.uniqueId}`,
-          retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
-          removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
-        }),
-      })
+      levelLambda
     );
     levelResource.addMethod("POST", levelLambdaIntegration);
 
     // /api/clear-chat resource
     const clearChatResource = apiResource.addResource("clear-chat");
+    const clearChatLambda = new NodejsFunction(this, "ClearChatLambda", {
+      runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
+      entry: "lambda/src/api/clearChat.ts",
+      handler: "handler",
+      bundling: {
+        externalModules: ["@aws-sdk/*"],
+        nodeModules: [],
+      },
+      environment: {
+        DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
+      },
+      logGroup: new cdk.aws_logs.LogGroup(this, "ClearChatLogGroup", {
+        logGroupName: `ClearChatLambdaLogGroup-${props.uniqueId}`,
+        retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
+        removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+    props.duckHuntTable.grantReadWriteData(clearChatLambda);
     const clearChatLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
-      new cdk.aws_lambda.Function(this, "ClearChatLambda", {
-        runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
-        code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api"),
-        handler: "clearChat.handler",
-        environment: {
-          DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
-        },
-        logGroup: new cdk.aws_logs.LogGroup(this, "ClearChatLogGroup", {
-          logGroupName: `ClearChatLambdaLogGroup-${props.uniqueId}`,
-          retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
-          removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
-        }),
-      })
+      clearChatLambda
     );
     clearChatResource.addMethod("POST", clearChatLambdaIntegration);
 
     // /api/ping-coordinates resource
     const pingCoordinatesResource = apiResource.addResource("ping-coordinates");
+    const pingCoordinatesLambda = new NodejsFunction(
+      this,
+      "PingCoordinatesLambda",
+      {
+        runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
+        entry: "lambda/src/api/pingCoordinates.ts",
+        handler: "handler",
+        bundling: {
+          externalModules: ["@aws-sdk/*"],
+          nodeModules: [],
+        },
+        environment: {
+          DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
+        },
+        logGroup: new cdk.aws_logs.LogGroup(this, "PingCoordinatesLogGroup", {
+          logGroupName: `PingCoordinatesLambdaLogGroup-${props.uniqueId}`,
+          retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
+          removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
+        }),
+      }
+    );
+    props.duckHuntTable.grantReadWriteData(pingCoordinatesLambda);
     const pingCoordinatesLambdaIntegration =
-      new cdk.aws_apigateway.LambdaIntegration(
-        new cdk.aws_lambda.Function(this, "PingCoordinatesLambda", {
-          runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
-          code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api"),
-          handler: "pingCoordinates.handler",
-          environment: {
-            DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
-          },
-          logGroup: new cdk.aws_logs.LogGroup(this, "PingCoordinatesLogGroup", {
-            logGroupName: `PingCoordinatesLambdaLogGroup-${props.uniqueId}`,
-            retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
-            removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
-          }),
-        })
-      );
+      new cdk.aws_apigateway.LambdaIntegration(pingCoordinatesLambda);
     pingCoordinatesResource.addMethod("POST", pingCoordinatesLambdaIntegration);
 
     // /api/upload-photo resource
     // const uploadPhotoResource = apiResource.addResource("upload-photo");
-    // const uploadPhotoLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
-    //   new cdk.aws_lambda.Function(this, "UploadPhotoLambda", {
-    //     runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
-    //     code: cdk.aws_lambda.Code.fromAsset("lambda/dist/api"),
-    //     handler: "uploadPhoto.handler",
-    //     environment: {
-    //       DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
-    //       PHOTO_BUCKET: props.photoBucket.bucketName,
-    //     },
-    //   })
-    // );
+    // const uploadPhotoLambda = new NodejsFunction(this, "UploadPhotoLambda", {
+    //   runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
+    //   entry: "lambda/src/api/uploadPhoto.ts",
+    //   handler: "handler",
+    //   bundling: {
+    //     externalModules: ["@aws-sdk/*"],
+    //     nodeModules: [],
+    //   },
+    //   environment: {
+    //     DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
+    //     PHOTO_BUCKET: props.photoBucket.bucketName,
+    //   },
+    //   logGroup: new cdk.aws_logs.LogGroup(this, "UploadPhotoLogGroup", {
+    //     logGroupName: `UploadPhotoLambdaLogGroup-${props.uniqueId}`,
+    //     retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
+    //     removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
+    //   }),
+    // });
+
+    // const uploadPhotoLambdaIntegration =
+    //   new cdk.aws_apigateway.LambdaIntegration(uploadPhotoLambda);
+    // props.photoBucket.grantReadWrite(uploadPhotoLambda);
     // uploadPhotoResource.addMethod("POST", uploadPhotoLambdaIntegration);
   }
 }

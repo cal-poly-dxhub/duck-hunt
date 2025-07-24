@@ -43,10 +43,6 @@ export class GameResources extends Construct {
           DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
           GAME_CONFIG_BUCKET_NAME: this.gameConfigBucket.bucketName,
         },
-        bundling: {
-          externalModules: ['@aws-sdk/*'],
-          nodeModules: ['uuid'],
-        },
       }
     );
 
@@ -58,7 +54,7 @@ export class GameResources extends Construct {
     const s3Trigger = new cdk.aws_s3_notifications.LambdaDestination(
       createGameLambda
     );
-    
+
     this.gameConfigBucket.addEventNotification(
       cdk.aws_s3.EventType.OBJECT_CREATED,
       s3Trigger

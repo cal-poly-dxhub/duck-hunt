@@ -4,7 +4,6 @@ import { validateUUID } from "@shared/scripts";
 import {
   corsHeaders,
   MessageResponseBody,
-  MessageRole,
   RequestHeaders,
   ResponseError,
 } from "@shared/types";

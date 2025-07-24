@@ -13,8 +13,7 @@ import { Team, TeamOperations } from "./team";
 import { User, UserOperations } from "./user";
 
 // Environment variable for table name
-export const TABLE_NAME =
-  process.env.DYNAMODB_TABLE_NAME || "ScavengerHuntData";
+export const DUCK_HUNT_TABLE_NAME = process.env.DUCK_HUNT_TABLE_NAME;
 
 // Initialize DynamoDB client
 export const client = new DynamoDBClient({});

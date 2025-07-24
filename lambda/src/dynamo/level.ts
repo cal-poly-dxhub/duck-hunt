@@ -6,7 +6,12 @@ import {
   QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
-import { BaseEntity, docClient, getCurrentTimestamp, TABLE_NAME } from ".";
+import {
+  BaseEntity,
+  docClient,
+  getCurrentTimestamp,
+  DUCK_HUNT_TABLE_NAME,
+} from ".";
 
 export interface Character {
   name: string;
@@ -43,17 +48,17 @@ export class LevelOperations {
     };
 
     const item = {
-      PK: `GAME#\${level.game_id}`,
-      SK: `LEVEL#\${level.id}`,
-      GSI1PK: `LEVEL#\${level.id}`,
-      GSI1SK: `GAME#\${level.game_id}`,
+      PK: `GAME#${level.game_id}`,
+      SK: `LEVEL#${level.id}`,
+      GSI1PK: `LEVEL#${level.id}`,
+      GSI1SK: `GAME#${level.game_id}`,
       ItemType: "LEVEL",
       ...level,
     };
 
     await docClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Item: item,
       })
     );
@@ -64,10 +69,10 @@ export class LevelOperations {
   static async getById(gameId: string, levelId: string): Promise<Level | null> {
     const result = await docClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
-          SK: `LEVEL#\${levelId}`,
+          PK: `GAME#${gameId}`,
+          SK: `LEVEL#${levelId}`,
         },
       })
     );
@@ -81,10 +86,10 @@ export class LevelOperations {
   static async getByGameId(gameId: string): Promise<Level[]> {
     const result = await docClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
         ExpressionAttributeValues: {
-          ":pk": `GAME#\${gameId}`,
+          ":pk": `GAME#${gameId}`,
           ":sk": "LEVEL#",
         },
       })
@@ -110,19 +115,19 @@ export class LevelOperations {
     updates.updated_at = getCurrentTimestamp();
 
     for (const [key, value] of Object.entries(updates)) {
-      updateExpression.push(`#\${key} = :\${key}`);
-      expressionAttributeNames[`#\${key}`] = key;
-      expressionAttributeValues[`:\${key}`] = value;
+      updateExpression.push(`#${key} = :${key}`);
+      expressionAttributeNames[`#${key}`] = key;
+      expressionAttributeValues[`:${key}`] = value;
     }
 
     const result = await docClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
-          SK: `LEVEL#\${levelId}`,
+          PK: `GAME#${gameId}`,
+          SK: `LEVEL#${levelId}`,
         },
-        UpdateExpression: `SET \${updateExpression.join(', ')}`,
+        UpdateExpression: `SET ${updateExpression.join(", ")}`,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
         ReturnValues: "ALL_NEW",
@@ -136,10 +141,10 @@ export class LevelOperations {
   static async delete(gameId: string, levelId: string): Promise<void> {
     await docClient.send(
       new DeleteCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Key: {
-          PK: `GAME#\${gameId}`,
-          SK: `LEVEL#\${levelId}`,
+          PK: `GAME#${gameId}`,
+          SK: `LEVEL#${levelId}`,
         },
       })
     );
