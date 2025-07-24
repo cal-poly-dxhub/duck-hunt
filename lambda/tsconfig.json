@@ -9,6 +9,7 @@
     "declaration": false,
     "sourceMap": false,
     "outDir": "./dist",
+    "baseUrl": ".",
     "paths": {
       "@shared/*": ["../shared/src/*"]
     }

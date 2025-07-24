@@ -1,18 +1,23 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
-  DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
   UpdateCommand,
   DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
-import { BaseEntity, docClient, getCurrentTimestamp, TABLE_NAME } from ".";
+import {
+  BaseEntity,
+  docClient,
+  getCurrentTimestamp,
+  DUCK_HUNT_TABLE_NAME,
+} from ".";
+import { Team } from "./team";
+import { Level } from "./level";
 
 export interface Game extends BaseEntity {
-  name: string;
-  description: string;
   levelsInGame?: number;
+  teams: Array<Team>;
+  levels: Array<Level>;
 }
 
 // GAME Operations
@@ -36,7 +41,7 @@ export class GameOperations {
 
     await docClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Item: item,
       })
     );
@@ -47,7 +52,7 @@ export class GameOperations {
   static async getById(gameId: string): Promise<Game | null> {
     const result = await docClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Key: {
           PK: `GAME#${gameId}`,
           SK: "#METADATA",
@@ -80,7 +85,7 @@ export class GameOperations {
 
     const result = await docClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Key: {
           PK: `GAME#${gameId}`,
           SK: "#METADATA",
@@ -99,7 +104,7 @@ export class GameOperations {
   static async delete(gameId: string): Promise<void> {
     await docClient.send(
       new DeleteCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Key: {
           PK: `GAME#${gameId}`,
           SK: "#METADATA",

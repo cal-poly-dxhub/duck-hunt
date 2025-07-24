@@ -4,12 +4,11 @@ import { validateUUID } from "@shared/scripts";
 import {
   corsHeaders,
   MessageResponseBody,
-  MessageRole,
   RequestHeaders,
   ResponseError,
 } from "@shared/types";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import { invokeBedrock, InvokeBedrockProps } from "@shared/invokeBedrock";
+import { invokeBedrock, InvokeBedrockProps } from "../invokeBedrock";
 
 const s3Client = new S3Client({});
 const dynamoClient = new DynamoDBClient({});
@@ -79,7 +78,7 @@ export const handler = async (
     // fetch and return the hardcoded initial message for the level
 
     const invokeBedrockProps: InvokeBedrockProps = {
-      systemPromptId: "00000000-0000-0000-0000-000000000000",
+      levelId: "00000000-0000-0000-0000-000000000000", // get from dynamo
       messageHistory: [],
     };
     const { bedrockResponseMessage, bedrockFailed } = await invokeBedrock(

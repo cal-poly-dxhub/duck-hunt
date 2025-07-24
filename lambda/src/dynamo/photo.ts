@@ -1,78 +1,69 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-  DynamoDBDocumentClient,
-  GetCommand,
-  PutCommand,
-  QueryCommand,
-  UpdateCommand,
-  DeleteCommand,
-} from "@aws-sdk/lib-dynamodb";
+import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
 import {
   BaseEntity,
   docClient,
   getCurrentTimestamp,
   getEpochTimestamp,
-  TABLE_NAME,
+  DUCK_HUNT_TABLE_NAME,
 } from ".";
 
-export interface Message extends BaseEntity {
+export interface Photo extends BaseEntity {
   user_id: string;
   team_id: string;
   game_id: string;
   level_id: string;
-  role: string;
-  text: string;
+  url: string;
 }
 
-// MESSAGE Operations
-export class MessageOperations {
+// PHOTO Operations
+export class PhotoOperations {
   static async create(
-    messageData: Omit<Message, "id" | "created_at" | "updated_at">
-  ): Promise<Message> {
-    const message: Message = {
+    photoData: Omit<Photo, "id" | "created_at" | "updated_at">
+  ): Promise<Photo> {
+    const photo: Photo = {
       id: uuidv4(),
       created_at: getCurrentTimestamp(),
       updated_at: getCurrentTimestamp(),
-      ...messageData,
+      ...photoData,
     };
 
     const timestamp = getEpochTimestamp();
-    const sortKey = `MESSAGE#${timestamp}#${message.id}`;
+    const sortKey = `PHOTO#${timestamp}#${photo.id}`;
 
     const item = {
-      PK: `USER#${message.user_id}`,
+      PK: `USER#${photo.user_id}`,
       SK: sortKey,
-      GSI1PK: `TEAM#${message.team_id}`,
+      GSI1PK: `TEAM#${photo.team_id}`,
       GSI1SK: sortKey,
-      GSI2PK: `GAME#${message.game_id}`,
+      GSI2PK: `GAME#${photo.game_id}`,
       GSI2SK: sortKey,
-      GSI3PK: `LEVEL#${message.level_id}`,
+      GSI3PK: `LEVEL#${photo.level_id}`,
       GSI3SK: sortKey,
-      ItemType: "MESSAGE",
-      ...message,
+      ItemType: "PHOTO",
+      ...photo,
     };
 
     await docClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Item: item,
       })
     );
 
-    return message;
+    return photo;
   }
 
-  static async getByUserId(userId: string, limit?: number): Promise<Message[]> {
+  static async getByUserId(userId: string, limit?: number): Promise<Photo[]> {
     const result = await docClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
         ExpressionAttributeValues: {
           ":pk": `USER#${userId}`,
-          ":sk": "MESSAGE#",
+          ":sk": "PHOTO#",
         },
-        ScanIndexForward: false, // Most recent first
+        ScanIndexForward: false,
         Limit: limit,
       })
     );
@@ -89,23 +80,23 @@ export class MessageOperations {
           GSI3PK,
           GSI3SK,
           ItemType,
-          ...message
+          ...photo
         } = item;
-        return message as Message;
+        return photo as Photo;
       }) || []
     );
   }
 
-  static async getByTeamId(teamId: string, limit?: number): Promise<Message[]> {
+  static async getByTeamId(teamId: string, limit?: number): Promise<Photo[]> {
     const result = await docClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         IndexName: "GSI1",
         KeyConditionExpression:
           "GSI1PK = :gsi1pk AND begins_with(GSI1SK, :gsi1sk)",
         ExpressionAttributeValues: {
           ":gsi1pk": `TEAM#${teamId}`,
-          ":gsi1sk": "MESSAGE#",
+          ":gsi1sk": "PHOTO#",
         },
         ScanIndexForward: false,
         Limit: limit,
@@ -124,23 +115,23 @@ export class MessageOperations {
           GSI3PK,
           GSI3SK,
           ItemType,
-          ...message
+          ...photo
         } = item;
-        return message as Message;
+        return photo as Photo;
       }) || []
     );
   }
 
-  static async getByGameId(gameId: string, limit?: number): Promise<Message[]> {
+  static async getByGameId(gameId: string, limit?: number): Promise<Photo[]> {
     const result = await docClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         IndexName: "GSI2",
         KeyConditionExpression:
           "GSI2PK = :gsi2pk AND begins_with(GSI2SK, :gsi2sk)",
         ExpressionAttributeValues: {
           ":gsi2pk": `GAME#${gameId}`,
-          ":gsi2sk": "MESSAGE#",
+          ":gsi2sk": "PHOTO#",
         },
         ScanIndexForward: false,
         Limit: limit,
@@ -159,26 +150,23 @@ export class MessageOperations {
           GSI3PK,
           GSI3SK,
           ItemType,
-          ...message
+          ...photo
         } = item;
-        return message as Message;
+        return photo as Photo;
       }) || []
     );
   }
 
-  static async getByLevelId(
-    levelId: string,
-    limit?: number
-  ): Promise<Message[]> {
+  static async getByLevelId(levelId: string, limit?: number): Promise<Photo[]> {
     const result = await docClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         IndexName: "GSI3",
         KeyConditionExpression:
           "GSI3PK = :gsi3pk AND begins_with(GSI3SK, :gsi3sk)",
         ExpressionAttributeValues: {
           ":gsi3pk": `LEVEL#${levelId}`,
-          ":gsi3sk": "MESSAGE#",
+          ":gsi3sk": "PHOTO#",
         },
         ScanIndexForward: false,
         Limit: limit,
@@ -197,9 +185,9 @@ export class MessageOperations {
           GSI3PK,
           GSI3SK,
           ItemType,
-          ...message
+          ...photo
         } = item;
-        return message as Message;
+        return photo as Photo;
       }) || []
     );
   }

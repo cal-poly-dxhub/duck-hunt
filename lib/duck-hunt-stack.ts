@@ -1,11 +1,13 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { DuckHuntStackProps } from "../bin/duck-hunt";
-import { AdminApiResources } from "./api/admin";
-import { PublicApiResources } from "./api/public";
+import { ApiResources } from "./api";
 import { DatastoreResources } from "./datastore";
 import { FrontendResources } from "./frontend";
+import { GameResources } from "./game";
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
+
+const REMOVAL_POLICY = cdk.RemovalPolicy.DESTROY;
 
 export class DuckHuntStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: DuckHuntStackProps) {
@@ -23,39 +25,33 @@ export class DuckHuntStack extends cdk.Stack {
     );
 
     // ------------ public api resources ------------
-    const publicApiResources = new PublicApiResources(
-      this,
-      "PublicApiResources",
-      {
-        uniqueId,
-        scavengerHuntTable: datastoreResources.scavengerHuntTable,
-        photoBucket: datastoreResources.photoBucket,
-      }
-    );
-
-    // ------------ admin api resources ------------
-    const adminApiResources = new AdminApiResources(this, "AdminApiResources", {
+    const apiResources = new ApiResources(this, "PublicApiResources", {
       uniqueId,
+      removalPolicy: REMOVAL_POLICY,
+      duckHuntTable: datastoreResources.duckHuntTable,
+      photoBucket: datastoreResources.photoBucket,
     });
 
     // ------------ frontend resources ------------
     const frontendResources = new FrontendResources(this, "FrontendResources", {
       uniqueId,
-      publicApi: publicApiResources.publicApi,
+      removalPolicy: REMOVAL_POLICY,
+      api: apiResources.api,
       photoBucket: datastoreResources.photoBucket,
+    });
+
+    // ------------ game resources ------------
+    const gameResources = new GameResources(this, "GameResources", {
+      uniqueId,
+      removalPolicy: REMOVAL_POLICY,
+      duckHuntTable: datastoreResources.duckHuntTable,
     });
 
     // ------------ outputs ------------
     new cdk.CfnOutput(this, "PublicApiUrl", {
-      value: publicApiResources.publicApi.url,
+      value: apiResources.api.url,
       description: "The URL of the public API",
       exportName: `PublicApiUrl-${uniqueId}`,
-    });
-
-    new cdk.CfnOutput(this, "AdminApiUrl", {
-      value: adminApiResources.adminApi.url,
-      description: "The URL of the admin API",
-      exportName: `AdminApiUrl-${uniqueId}`,
     });
 
     new cdk.CfnOutput(this, "FrontendDistributionDomain", {

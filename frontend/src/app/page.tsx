@@ -193,7 +193,7 @@ export default function Chat() {
         createdAt: new Date(),
       };
 
-      setMessages([systemMessage, ...(data?.messageHistory ?? [])]);
+      setMessages([systemMessage, data.message]);
       typeMessage(systemMessage);
       setLoading(false);
     };

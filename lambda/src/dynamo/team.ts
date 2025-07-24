@@ -1,4 +1,9 @@
-import { BaseEntity, docClient, getCurrentTimestamp, TABLE_NAME } from ".";
+import {
+  BaseEntity,
+  docClient,
+  getCurrentTimestamp,
+  DUCK_HUNT_TABLE_NAME,
+} from ".";
 import {
   GetCommand,
   PutCommand,
@@ -11,7 +16,6 @@ import { v4 as uuidv4 } from "uuid";
 export interface Team extends BaseEntity {
   name: string;
   game_id: string;
-  difficulty_level: string;
 }
 
 // TEAM Operations
@@ -35,7 +39,7 @@ export class TeamOperations {
 
     await docClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Item: item,
       })
     );
@@ -46,7 +50,7 @@ export class TeamOperations {
   static async getById(gameId: string, teamId: string): Promise<Team | null> {
     const result = await docClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Key: {
           PK: `GAME#${gameId}`,
           SK: `TEAM#${teamId}`,
@@ -63,7 +67,7 @@ export class TeamOperations {
   static async getByGameId(gameId: string): Promise<Team[]> {
     const result = await docClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
         ExpressionAttributeValues: {
           ":pk": `GAME#${gameId}`,
@@ -99,7 +103,7 @@ export class TeamOperations {
 
     const result = await docClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Key: {
           PK: `GAME#${gameId}`,
           SK: `TEAM#${teamId}`,
@@ -118,7 +122,7 @@ export class TeamOperations {
   static async delete(gameId: string, teamId: string): Promise<void> {
     await docClient.send(
       new DeleteCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Key: {
           PK: `GAME#${gameId}`,
           SK: `TEAM#${teamId}`,

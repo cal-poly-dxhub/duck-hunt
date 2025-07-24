@@ -5,7 +5,7 @@ import {
   docClient,
   getCurrentTimestamp,
   getEpochTimestamp,
-  TABLE_NAME,
+  DUCK_HUNT_TABLE_NAME,
 } from ".";
 
 export interface CoordinateSnapshot extends BaseEntity {
@@ -41,7 +41,7 @@ export class CoordinateSnapshotOperations {
 
     await docClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Item: item,
       })
     );
@@ -55,7 +55,7 @@ export class CoordinateSnapshotOperations {
   ): Promise<CoordinateSnapshot[]> {
     const result = await docClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
         ExpressionAttributeValues: {
           ":pk": `USER#${userId}`,
@@ -80,7 +80,7 @@ export class CoordinateSnapshotOperations {
   ): Promise<CoordinateSnapshot[]> {
     const result = await docClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         IndexName: "GSI1",
         KeyConditionExpression:
           "GSI1PK = :gsi1pk AND begins_with(GSI1SK, :gsi1sk)",

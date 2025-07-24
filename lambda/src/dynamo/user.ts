@@ -1,4 +1,9 @@
-import { BaseEntity, docClient, getCurrentTimestamp, TABLE_NAME } from ".";
+import {
+  BaseEntity,
+  docClient,
+  getCurrentTimestamp,
+  DUCK_HUNT_TABLE_NAME,
+} from ".";
 import {
   GetCommand,
   PutCommand,
@@ -35,7 +40,7 @@ export class UserOperations {
 
     await docClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Item: item,
       })
     );
@@ -46,7 +51,7 @@ export class UserOperations {
   static async getById(userId: string): Promise<User | null> {
     const result = await docClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         IndexName: "GSI1",
         KeyConditionExpression: "GSI1PK = :gsi1pk",
         ExpressionAttributeValues: {
@@ -64,7 +69,7 @@ export class UserOperations {
   static async getByTeamId(teamId: string): Promise<User[]> {
     const result = await docClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
         ExpressionAttributeValues: {
           ":pk": `TEAM#${teamId}`,
@@ -100,7 +105,7 @@ export class UserOperations {
 
     const result = await docClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Key: {
           PK: `TEAM#${teamId}`,
           SK: `USER#${userId}`,
@@ -119,7 +124,7 @@ export class UserOperations {
   static async delete(teamId: string, userId: string): Promise<void> {
     await docClient.send(
       new DeleteCommand({
-        TableName: TABLE_NAME,
+        TableName: DUCK_HUNT_TABLE_NAME,
         Key: {
           PK: `TEAM#${teamId}`,
           SK: `USER#${userId}`,
