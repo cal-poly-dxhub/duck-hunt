@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "workspaces": [
     "lambda",
-    "frontend"
+    "frontend",
+    "shared"
   ],
   "bin": "bin/duck-hunt.js",
   "scripts": {
