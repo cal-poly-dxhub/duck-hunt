@@ -1,3 +1,4 @@
+import { validateUUID } from "@shared/scripts";
 import { ApiResponse } from "@shared/types";
 
 interface ApiRequestOptions {
@@ -22,6 +23,18 @@ export async function apiRequest<T = unknown>(
 
     const teamId = localStorage.getItem("teamId");
     const userId = localStorage.getItem("userId");
+
+    // TODO: teamId and userId validataion
+
+    if (!validateUUID(userId)) {
+      console.error("User ID not valid");
+      throw new Error("User ID not valid. Try clearing your browser cookies.");
+    } else if (!validateUUID(teamId)) {
+      console.error("Team ID not valid");
+      throw new Error(
+        "Team ID not valid. Try scanning your team duck again or clearing your browser cookies."
+      );
+    }
 
     let url = endpoint;
     Object.entries(params).forEach(([key, value]) => {
@@ -88,10 +101,15 @@ export async function apiRequest<T = unknown>(
       }
 
       return {
-        data: null as T,
+        data: null,
         success: false,
         status: response.status,
-        error: errorMessage,
+        error: {
+          error: errorMessage,
+          displayMessage:
+            "The server did not respond properly. Try again or contact support.",
+          details: "Server response was not OK: " + errorMessage,
+        },
       };
     }
 
@@ -102,19 +120,24 @@ export async function apiRequest<T = unknown>(
     // });
 
     return {
-      data,
+      data: data,
       status: response.status,
       success: true,
+      error: null,
     };
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred";
 
     return {
-      data: null as T,
+      data: null,
       success: false,
       status: 500,
-      error: errorMessage,
+      error: {
+        error: errorMessage,
+        displayMessage: "An unexpected error occurred. Please try again later.",
+        details: "Error caught without message in top level catch",
+      },
     };
   }
 }

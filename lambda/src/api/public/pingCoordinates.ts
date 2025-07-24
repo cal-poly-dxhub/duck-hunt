@@ -1,25 +1,14 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { S3Client } from "@aws-sdk/client-s3";
 import { validateUUID } from "@shared/scripts";
-import {
-  corsHeaders,
-  MessageRequestBody,
-  MessageResponseBody,
-  MessageRole,
-  RequestHeaders,
-  ResponseError,
-} from "@shared/types";
+import { corsHeaders, RequestHeaders, ResponseError } from "@shared/types";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 
-const s3Client = new S3Client({});
 const dynamoClient = new DynamoDBClient({});
 
 /**
- * /message lambda handler
- * Handles incoming messages from users, validates headers, and returns a response.
- * If the user has not sent a message before, it returns a hardcoded assistant message.
- * If the user has sent messages, it processes the latest message and returns a response.
- * Checks the time since the user started the level and provides hint/map link if necessary.
+ * /ping-coordinates lambda handler
+ * Handles requests when the frontend pings the server with coordinates.
+ * Enters the coordinates into dynamoDB.
  * @param event
  */
 export const handler = async (
@@ -65,53 +54,15 @@ export const handler = async (
   try {
     // query dynamo for user
     // query dynamo for team
-    // query dynamo for team's current level
 
-    // check how long since they started the level
-    // if >10 min, return easy hint
-    // if >15 min, return maps link
-
-    // query dynamo for user's messages at this level
-
-    // if latest message is from user, remove from message history
-    // if messages do not alternate roles, fix
-
-    const requestBody: MessageRequestBody = JSON.parse(event.body || "{}");
-    if (!requestBody.message || !requestBody.message.content) {
-      return {
-        statusCode: 400,
-        headers: corsHeaders,
-        body: JSON.stringify({
-          error: "Invalid request body.",
-          displayMessage: "Please provide a valid message.",
-          details: "Message content is required.",
-        } as ResponseError),
-      };
-    }
-
-    // build prompt from s3
-    // invoke bedrock with prompt and user's (current level, not deleted) message history
-
-    // process bedrock response
-    // save response message to dynamo
-
-    // stub response
-    const responseBody: MessageResponseBody = {
-      message: {
-        id: requestBody.message.id + 1,
-        role: MessageRole.Assistant,
-        content:
-          "This is a stub response for /message endpoint. You said: " +
-          requestBody.message.content,
-        createdAt: new Date(),
-      },
-      mapLink: null,
-    };
+    // insert coordinates into dynamoDB
 
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify(responseBody),
+      body: JSON.stringify({
+        message: "Coordinates received and processed successfully.",
+      }),
     };
   } catch (error) {
     console.error("ERROR: Failed to process request:", error);

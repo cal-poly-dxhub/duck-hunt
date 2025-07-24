@@ -65,6 +65,12 @@ const GameProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem("teamId", "9a9ce1db-56c6-468c-a73e-b0db8491db7f");
+    localStorage.setItem("userId", "9a9ce1db-56c6-468c-a73e-b0db8491db7f");
+    // localStorage.clear();
+  }, []);
+
   return (
     <GameContext.Provider
       value={{

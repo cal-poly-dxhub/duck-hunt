@@ -1,217 +1,171 @@
+import { validateUUID } from "@shared/scripts";
+import {
+  LevelResponseBody,
+  Message,
+  MessageResponseBody,
+  MessageRole,
+} from "@shared/types";
 import { apiRequest } from "./apiRequest";
 
-interface AtLevelResponse {
-  success: boolean;
-  message: string;
-  level: string;
-  messageHistory: import("../constants/types").Message[];
-}
-
-const message = async (prompt: string) => {
+// /message
+const message = async (
+  userMessage: Message<MessageRole.User>
+): Promise<MessageResponseBody> => {
   try {
-    const response = await apiRequest<{ message: string; response: string }>(
+    if (
+      !userMessage.id ||
+      !userMessage.content ||
+      !userMessage.role ||
+      !userMessage.createdAt
+    ) {
+      console.error("Invalid user message:", JSON.stringify(userMessage));
+      throw new Error("Invalid user message. Please try again.");
+    }
+
+    const { data, success, error } = await apiRequest<MessageResponseBody>(
       "POST",
       `${process.env.NEXT_PUBLIC_API_BASE_URL}/message`,
       {
-        body: { prompt },
+        body: { message: userMessage },
       }
     );
 
-    if (response.status === 406) {
-      return { success: false, status: 406, error: response.error };
+    if (!success) {
+      console.error("/message returned not success:", JSON.stringify(error));
+      throw new Error(error.displayMessage);
     }
 
-    if (!response.success) {
-      console.error("API Error:", response);
-      throw new Error(response.error || "Failed to send message");
-    }
-
-    return {
-      success: true,
-      status: response.status,
-      message: response.data.response,
-    };
+    return data;
   } catch (error) {
     console.error("Error in message function:", error);
-    if ((error as { status?: number }).status === 500) {
-      return { success: false, status: 500, error: "Failed to send message" };
-    } else {
-      return {
-        success: false,
-        status: 500,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
+    return {
+      message: {
+        id: userMessage.id + 1,
+        role: MessageRole.Assistant,
+        content: "Failed to send message. Please try again or contact support.",
+        createdAt: new Date(),
+      },
+      mapLink: null,
+    };
   }
 };
 
-const atLevel = async (
-  levelId: string
-): Promise<AtLevelResponse | { success: false; error: string }> => {
+// /level
+const level = async (levelId: string | null): Promise<LevelResponseBody> => {
   try {
-    const response = await apiRequest<{
-      message: string;
-      level_id: string;
-      message_history: {
-        id: string;
-        text: string;
-        sender: "user" | "system";
-        timestamp: string;
-      }[];
-    }>("POST", `${process.env.NEXT_PUBLIC_API_BASE_URL}/at-level/${levelId}`);
-
-    if (!response.success) {
-      throw new Error(response.error || "Failed to get level");
+    if (levelId !== undefined && !validateUUID(levelId)) {
+      console.error("Level ID not valid");
+      throw new Error(
+        "Level ID not valid. Try scanning another duck at this location."
+      );
     }
 
-    const messageHistory = (response.data.message_history || []).map(
-      (msg, index) => ({
-        ...msg,
-        id: new Date(msg.timestamp).getTime() + index,
-        timestamp: new Date(msg.timestamp),
-      })
+    const { data, success, error } = await apiRequest<LevelResponseBody>(
+      "POST",
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/level`,
+      {
+        body: { levelId },
+      }
     );
 
-    return {
-      success: true,
-      message: response.data.message,
-      level: response.data.level_id,
-      messageHistory: messageHistory,
-    };
+    if (!success) {
+      console.error("/level returned not success:", JSON.stringify(error));
+      throw new Error(error.displayMessage);
+    }
+
+    return data;
   } catch (error) {
     console.error("Error in atLevel function:", error);
-    if ((error as { status?: number }).status === 500) {
-      return { success: false, error: "Failed to send message" };
-    } else {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
-  }
-};
-
-const finishGame = async (endSequence: string) => {
-  try {
-    const response = await apiRequest<{ message: string }>(
-      "POST",
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/finish-game/${endSequence}`
-    );
-
-    if (!response.success) {
-      throw new Error(response.error || "Failed to end game");
-    }
-
     return {
-      success: true,
-      message:
-        response.data.message ??
-        "Congratulations! You have completed the scavenger hunt!",
+      currentLevel: "00000000-0000-0000-0000-000000000000",
+      messageHistory: [
+        {
+          id: 1,
+          content:
+            "Failed to retrieve level data. Please try later or contact support.",
+          role: MessageRole.Assistant,
+          createdAt: new Date(),
+        },
+      ],
+      requiresPhoto: false,
     };
-  } catch (error) {
-    console.error("Error in finishGame function:", error);
-    if ((error as { status?: number }).status === 500) {
-      return { success: false, error: "Failed to end game" };
-    } else {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
   }
 };
 
-const clearChat = async () => {
+const clearChat = async (): Promise<MessageResponseBody> => {
   try {
-    const response = await apiRequest(
+    const { data, success, error } = await apiRequest<MessageResponseBody>(
       "POST",
       `${process.env.NEXT_PUBLIC_API_BASE_URL}/clear-chat`
     );
 
-    if (!response.success) {
-      throw new Error(response.error || "Failed to clear chat");
+    if (!success) {
+      console.error("/clear-chat returned not success:", JSON.stringify(error));
+      throw new Error(error.displayMessage);
     }
 
-    return {
-      success: true,
-      message: "Chat cleared successfully",
-    };
+    return data;
   } catch (error) {
     console.error("Error in clearChat function:", error);
-    if ((error as { status?: number }).status === 500) {
-      return { success: false, error: "Failed to clear chat" };
-    } else {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
+    return {
+      message: {
+        id: 1,
+        role: MessageRole.Assistant,
+        content: "Failed to clear chat. Please try again or contact support.",
+        createdAt: new Date(),
+      },
+      mapLink: null,
+    };
   }
 };
 
+// helper function for getting user coordinates from browser
+// TODO: mobile coordinates
+const getCoordinates = (): Promise<{
+  latitude: number;
+  longitude: number;
+}> => {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Geolocation is not supported by your browser"));
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      },
+      (error) => {
+        reject(new Error(`Failed to get location: ${error.message}`));
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 2000,
+        maximumAge: 0,
+      }
+    );
+  });
+};
+
+// /ping-coordinates
 const pingCoordinates = async () => {
   try {
-    // get coordinates of device
-    // Function to get device coordinates using Geolocation API
-    const getCoordinates = (): Promise<{
-      latitude: number;
-      longitude: number;
-    }> => {
-      return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-          reject(new Error("Geolocation is not supported by your browser"));
-        }
-
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            resolve({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-            });
-          },
-          (error) => {
-            reject(new Error(`Failed to get location: ${error.message}`));
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 2000,
-            maximumAge: 0,
-          }
-        );
-      });
-    };
-
     const coordinates = await getCoordinates();
-
-    const response = await apiRequest<{ message: string }>(
+    await apiRequest(
       "POST",
       `${process.env.NEXT_PUBLIC_API_BASE_URL}/ping-coordinates`,
       {
         body: coordinates,
       }
     );
-
-    if (!response.success) {
-      throw new Error(response.error || "Failed to ping coordinates");
-    }
-
-    return {
-      success: true,
-      message: response.data.message,
-    };
   } catch (error) {
     console.error("Error in pingCoordinates function:", error);
-    if ((error as { status?: number }).status === 500) {
-      return { success: false, error: "Failed to ping coordinates" };
-    } else {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
   }
 };
 
+// /upload-photo
 const uploadTeamPhoto = async (file: File) => {
   try {
     const formData = new FormData();
@@ -220,18 +174,24 @@ const uploadTeamPhoto = async (file: File) => {
     const teamId = localStorage.getItem("teamId");
     const userId = localStorage.getItem("userId");
 
-    if (!teamId || !userId) {
-      throw new Error("Team ID or User ID not found in local storage");
+    if (!validateUUID(userId)) {
+      console.error("User ID not valid");
+      throw new Error("User ID not valid. Try clearing your browser cookies.");
+    } else if (!validateUUID(teamId)) {
+      console.error("Team ID not valid");
+      throw new Error(
+        "Team ID not valid. Try scanning your team duck again or clearing your browser cookies."
+      );
     }
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/team-photo`,
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/upload-photo`,
       {
         method: "POST",
         body: formData,
         headers: {
-          "user-id": userId,
-          "team-id": teamId,
+          "user-id": userId as string,
+          "team-id": teamId as string,
         },
       }
     );
@@ -261,9 +221,8 @@ const uploadTeamPhoto = async (file: File) => {
 
 export const scavengerHuntApi = {
   message,
-  atLevel,
+  level,
   pingCoordinates,
-  finishGame,
   clearChat,
   uploadTeamPhoto,
 };

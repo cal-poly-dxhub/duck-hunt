@@ -131,7 +131,7 @@ export class FrontendResources extends Construct {
             value: cdk.Aws.REGION,
           },
           NEXT_PUBLIC_API_BASE_URL: {
-            value: props.publicApi.url,
+            value: props.publicApi.url + "api/public",
           },
         },
         buildSpec: cdk.aws_codebuild.BuildSpec.fromObject({
