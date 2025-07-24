@@ -5,7 +5,13 @@
   "scripts": {
     "build": "tsc && cp src/frontend-rewrite.js dist/frontend-rewrite.js"
   },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.848.0",
+    "@aws-sdk/lib-dynamodb": "^3.850.0",
+    "uuid": "^9.0.0"
+  },
   "devDependencies": {
-    "@aws-sdk/lib-dynamodb": "^3.850.0"
+    "@types/node": "^18.0.0",
+    "@types/uuid": "^9.0.0"
   }
 }
