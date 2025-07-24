@@ -15,8 +15,8 @@ export class AdminApiResources extends Construct {
     const stack = cdk.Stack.of(this);
 
     // api
-    this.adminApi = new cdk.aws_apigateway.RestApi(this, "MeetingAuthApi", {
-      description: "API for video authentication",
+    this.adminApi = new cdk.aws_apigateway.RestApi(this, "AdminApi", {
+      description: "API for admin requests",
       deployOptions: {
         stageName: "prod",
         loggingLevel: cdk.aws_apigateway.MethodLoggingLevel.INFO,

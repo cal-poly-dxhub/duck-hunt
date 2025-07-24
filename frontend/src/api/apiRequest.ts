@@ -1,7 +1,6 @@
 import { ApiResponse } from "@shared/types";
 
 interface ApiRequestOptions {
-  method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   params?: Record<string, string | number>;
   query?: Record<string, string | number | boolean>;
   body?: unknown;

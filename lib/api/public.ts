@@ -18,8 +18,8 @@ export class PublicApiResources extends Construct {
     const stack = cdk.Stack.of(this);
 
     // api
-    this.publicApi = new cdk.aws_apigateway.RestApi(this, "MeetingAuthApi", {
-      description: "API for video authentication",
+    this.publicApi = new cdk.aws_apigateway.RestApi(this, "PublicApi", {
+      description: "API for frontend public requests",
       deployOptions: {
         stageName: "prod",
         loggingLevel: cdk.aws_apigateway.MethodLoggingLevel.INFO,
