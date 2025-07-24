@@ -10,7 +10,6 @@ export interface DatastoreResourcesProps {
 export class DatastoreResources extends Construct {
   public readonly scavengerHuntTable: dynamodb.Table;
   public readonly photoBucket: cdk.aws_s3.Bucket;
-  public readonly promptBucket: cdk.aws_s3.Bucket;
 
   constructor(scope: Construct, id: string, props: DatastoreResourcesProps) {
     super(scope, id);
@@ -85,17 +84,6 @@ export class DatastoreResources extends Construct {
         removalPolicy: props.removalPolicy ?? cdk.RemovalPolicy.DESTROY,
         autoDeleteObjects: true,
         bucketName: `photo-bucket-${props.uniqueId}`,
-      }
-    );
-
-    // S3 Bucket for Prompts
-    this.promptBucket = new cdk.aws_s3.Bucket(
-      this,
-      `PromptBucket-${props.uniqueId}`,
-      {
-        removalPolicy: props.removalPolicy ?? cdk.RemovalPolicy.DESTROY,
-        autoDeleteObjects: true,
-        bucketName: `prompt-bucket-${props.uniqueId}`,
       }
     );
   }

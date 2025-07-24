@@ -30,7 +30,6 @@ export class DuckHuntStack extends cdk.Stack {
         uniqueId,
         scavengerHuntTable: datastoreResources.scavengerHuntTable,
         photoBucket: datastoreResources.photoBucket,
-        promptBucket: datastoreResources.promptBucket,
       }
     );
 
@@ -44,7 +43,6 @@ export class DuckHuntStack extends cdk.Stack {
       uniqueId,
       publicApi: publicApiResources.publicApi,
       photoBucket: datastoreResources.photoBucket,
-      promptBucket: datastoreResources.promptBucket,
     });
 
     // ------------ outputs ------------
