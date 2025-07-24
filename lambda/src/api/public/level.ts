@@ -1,5 +1,6 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { S3Client } from "@aws-sdk/client-s3";
+import { invokeBedrock, InvokeBedrockProps } from "@shared/invokeBedrock";
 import { validateUUID } from "@shared/scripts";
 import {
   corsHeaders,
@@ -77,25 +78,30 @@ export const handler = async (
     // if latest message is from user, remove from message history
     // if messages do not alternate roles, fix
 
+    const initialLevelMessage = {
+      id: 0,
+      role: MessageRole.User,
+      content: "Hello. Introduce yourself and your job.",
+      createdAt: new Date(),
+    };
+
+    const invokeBedrockProps: InvokeBedrockProps = {
+      systemPromptId: "00000000-0000-0000-0000-000000000000",
+      messageHistory: [initialLevelMessage],
+    };
+    const { bedrockResponseMessage, bedrockFailed } = await invokeBedrock(
+      invokeBedrockProps
+    );
+
+    if (bedrockFailed) {
+      console.error("Bedrock failed");
+      // TODO: handle bedrock failed?
+    }
+
     // stub response
     const responseBody: LevelResponseBody = {
       currentLevel: crypto.randomUUID(),
-      messageHistory: [
-        {
-          id: 1,
-          role: MessageRole.User,
-          content: "Hello",
-          createdAt: new Date(),
-        },
-        {
-          id: 2,
-          role: MessageRole.Assistant,
-          content: `This is a stub response for submitted level: ${
-            requestBody.levelId || "unknown"
-          }`,
-          createdAt: new Date(),
-        },
-      ],
+      message: bedrockResponseMessage,
       requiresPhoto: true,
     };
 
@@ -115,7 +121,7 @@ export const handler = async (
         details:
           error instanceof Error
             ? error.message
-            : "Error caught without message in top level catch",
+            : "Error caught in level lambda top level catch",
       } as ResponseError),
     };
   }

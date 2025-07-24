@@ -19,7 +19,6 @@ import { IconSend, IconTrash, IconUpload } from "@tabler/icons-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { v4 } from "uuid";
-// import Markdown from "react-markdown";
 
 const blinkAnimation = `
   @keyframes blink {
@@ -357,7 +356,6 @@ export default function Chat() {
                       </span>
                     </span>
                   ) : (
-                    // <Markdown>{displayText}</Markdown>
                     displayText
                   )}
                   {message.role === MessageRole.Assistant &&

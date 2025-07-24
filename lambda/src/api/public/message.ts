@@ -1,5 +1,6 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { S3Client } from "@aws-sdk/client-s3";
+import { invokeBedrock, InvokeBedrockProps } from "@shared/invokeBedrock";
 import { validateUUID } from "@shared/scripts";
 import {
   corsHeaders,
@@ -95,16 +96,38 @@ export const handler = async (
     // process bedrock response
     // save response message to dynamo
 
-    // stub response
-    const responseBody: MessageResponseBody = {
-      message: {
-        id: requestBody.message.id + 1,
-        role: MessageRole.Assistant,
-        content:
-          "This is a stub response for /message endpoint. You said: " +
-          requestBody.message.content,
+    // TODO: replace with actual message history
+    const STUBMessageHistory = [
+      {
+        id: 0,
+        role: MessageRole.User,
+        content: "Hello. Introduce yourself and your job.",
         createdAt: new Date(),
       },
+      {
+        id: 1,
+        role: MessageRole.Assistant,
+        content: "Hello, I am an assistant for duck hunt.",
+        createdAt: new Date(),
+      },
+    ];
+
+    const invokeBedrockProps: InvokeBedrockProps = {
+      systemPromptId: "00000000-0000-0000-0000-000000000000",
+      messageHistory: STUBMessageHistory,
+    };
+    const { bedrockResponseMessage, bedrockFailed } = await invokeBedrock(
+      invokeBedrockProps
+    );
+
+    if (bedrockFailed) {
+      console.error("Bedrock failed");
+      // TODO: handle bedrock failed?
+    }
+
+    // stub response
+    const responseBody: MessageResponseBody = {
+      message: bedrockResponseMessage,
       mapLink: null,
     };
 
@@ -124,7 +147,7 @@ export const handler = async (
         details:
           error instanceof Error
             ? error.message
-            : "Error caught without message in top level catch",
+            : "Error caught in message lambda top level catch",
       } as ResponseError),
     };
   }

@@ -9,6 +9,7 @@ import {
   ResponseError,
 } from "@shared/types";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import { invokeBedrock, InvokeBedrockProps } from "@shared/invokeBedrock";
 
 const s3Client = new S3Client({});
 const dynamoClient = new DynamoDBClient({});
@@ -77,14 +78,22 @@ export const handler = async (
     // soft delete all messages for the user at the current level
     // fetch and return the hardcoded initial message for the level
 
+    const invokeBedrockProps: InvokeBedrockProps = {
+      systemPromptId: "00000000-0000-0000-0000-000000000000",
+      messageHistory: [],
+    };
+    const { bedrockResponseMessage, bedrockFailed } = await invokeBedrock(
+      invokeBedrockProps
+    );
+
+    if (bedrockFailed) {
+      console.error("Bedrock failed");
+      // TODO: handle bedrock failed?
+    }
+
     // stub response
     const responseBody: MessageResponseBody = {
-      message: {
-        id: 1,
-        role: MessageRole.Assistant,
-        content: "This is a stub response for /clearChat endpoint.",
-        createdAt: new Date(),
-      },
+      message: bedrockResponseMessage,
       mapLink: null,
     };
 
@@ -104,7 +113,7 @@ export const handler = async (
         details:
           error instanceof Error
             ? error.message
-            : "Error caught without message in top level catch",
+            : "Error caught in clearChat lambda top level catch",
       } as ResponseError),
     };
   }
