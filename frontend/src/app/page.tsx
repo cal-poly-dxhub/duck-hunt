@@ -193,7 +193,6 @@ export default function Chat() {
 
       if (requiresPhoto) {
         setNeedsTeamPhoto(true);
-        return;
       }
 
       if (mapLink !== null) {

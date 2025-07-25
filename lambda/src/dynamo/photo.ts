@@ -70,6 +70,8 @@ export class PhotoOperations {
       })
     );
 
+    console.log("INFO: Retrieved photos for level:", levelId, result);
+
     return (
       result.Items?.map((item) => {
         const {

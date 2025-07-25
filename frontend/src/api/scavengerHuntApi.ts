@@ -196,13 +196,10 @@ const pingCoordinates = async () => {
 // /upload-photo
 const uploadTeamPhoto = async (file: File) => {
   try {
-    const formData = new FormData();
-    formData.append("photo", file);
-
     const teamId = localStorage.getItem("teamId");
     const userId = localStorage.getItem("userId");
 
-    // handle manually - not using apiRequest
+    // Validate IDs first
     if (!validateUUID(userId)) {
       console.error("User ID not valid");
       throw new Error("User ID not valid. Try clearing your browser cookies.");
@@ -213,11 +210,30 @@ const uploadTeamPhoto = async (file: File) => {
       );
     }
 
-    const response = await fetch(
+    // Convert file to base64
+    const base64File = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove the data:image/jpeg;base64, prefix
+        const base64Data = result.split(",")[1];
+        resolve(base64Data);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    // Use your existing apiRequest function
+    const { data, success, error } = await apiRequest(
+      "POST",
       `${process.env.NEXT_PUBLIC_API_BASE_URL}/upload-photo`,
       {
-        method: "POST",
-        body: formData,
+        body: {
+          photo: base64File,
+          filename: file.name,
+          contentType: file.type,
+          size: file.size,
+        },
         headers: {
           "user-id": userId as string,
           "team-id": teamId as string,
@@ -225,21 +241,14 @@ const uploadTeamPhoto = async (file: File) => {
       }
     );
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw {
-        error: data.error || "Error uploading photo",
-        displayMessage:
-          data.displayMessage ||
-          "Failed to upload photo. Please try again or contact support.",
-        details: data.details || "An error occurred while uploading the photo.",
-      } as ResponseError;
+    if (!success) {
+      throw error;
     }
 
     return {
       success: true,
-      message: data.message || "Photo uploaded successfully",
+      message:
+        (data as { message?: string }).message || "Photo uploaded successfully",
     };
   } catch (error) {
     console.error("Error in uploadTeamPhoto function:", error);

@@ -1,217 +1,184 @@
-// import { RequestHeaders } from "@shared/types";
-// import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-// import * as AWS from "aws-sdk";
-// import * as multipart from "lambda-multipart-parser";
-// import { fetchBaseData } from "./fetchBaseData";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { corsHeaders, RequestHeaders } from "@shared/types";
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import { PhotoOperations } from "src/dynamo/photo";
+import { v4 as uuidv4 } from "uuid";
+import { fetchBaseData } from "./fetchBaseData";
 
-// // Initialize S3 client
-// const s3 = new AWS.S3();
-// const BUCKET_NAME = process.env.PHOTO_BUCKET_NAME || "your-photo-bucket";
+const s3Client = new S3Client({ region: process.env.AWS_REGION });
 
-// interface UploadResponse {
-//   success: boolean;
-//   message?: string;
-//   error?: string;
-//   displayMessage?: string;
-//   details?: string;
-//   photoUrl?: string;
-// }
+interface UploadPhotoRequest {
+  photo: string; // base64 encoded image data
+  filename: string;
+  contentType: string;
+  size: number;
+}
 
-// /**
-//  * /upload-photo lambda handler
-//  * @param event
-//  */
-// export const handler = async (
-//   event: APIGatewayProxyEvent
-// ): Promise<APIGatewayProxyResult> => {
-//   console.log("INFO: Received event:", JSON.stringify(event, null, 2));
+const detectImageFormat = (
+  base64Data: string,
+  contentType?: string
+): { extension: string; mimeType: string } => {
+  // First try to use the provided content type
+  if (contentType) {
+    if (contentType.includes("jpeg") || contentType.includes("jpg")) {
+      return { extension: "jpg", mimeType: "image/jpeg" };
+    }
+    if (contentType.includes("png")) {
+      return { extension: "png", mimeType: "image/png" };
+    }
+    if (contentType.includes("gif")) {
+      return { extension: "gif", mimeType: "image/gif" };
+    }
+  }
 
-//   try {
-//     // Validate request method
-//     if (event.httpMethod !== "POST") {
-//       return {
-//         statusCode: 405,
-//         headers: {
-//           "Content-Type": "application/json",
-//           "Access-Control-Allow-Origin": "*",
-//           "Access-Control-Allow-Headers": "Content-Type,user-id,team-id",
-//           "Access-Control-Allow-Methods": "POST,OPTIONS",
-//         },
-//         body: JSON.stringify({
-//           error: "Method not allowed",
-//           displayMessage: "Only POST method is allowed for photo upload.",
-//         }),
-//       };
-//     }
+  // Fallback to checking the base64 data
+  const buffer = Buffer.from(base64Data, "base64");
 
-//     // Validate request headers
-//     const headers = event.headers as unknown as RequestHeaders;
+  // Check for JPEG
+  if (
+    buffer.length >= 3 &&
+    buffer[0] === 0xff &&
+    buffer[1] === 0xd8 &&
+    buffer[2] === 0xff
+  ) {
+    return { extension: "jpg", mimeType: "image/jpeg" };
+  }
 
-//     let baseData;
-//     try {
-//       baseData = await fetchBaseData(headers);
-//     } catch (error) {
-//       console.error("Error fetching base data:", error);
-//       return {
-//         statusCode: 400,
-//         headers: {
-//           "Content-Type": "application/json",
-//           "Access-Control-Allow-Origin": "*",
-//         },
-//         body: JSON.stringify({
-//           error: "Invalid request headers",
-//           displayMessage:
-//             "Invalid user or team ID. Try clearing your browser cookies.",
-//           details: error instanceof Error ? error.message : "Unknown error",
-//         }),
-//       };
-//     }
+  // Check for PNG
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return { extension: "png", mimeType: "image/png" };
+  }
 
-//     // Parse multipart form data
-//     let parsedEvent;
-//     try {
-//       parsedEvent = await multipart.parse(event);
-//     } catch (error) {
-//       console.error("Error parsing multipart data:", error);
-//       return {
-//         statusCode: 400,
-//         headers: {
-//           "Content-Type": "application/json",
-//           "Access-Control-Allow-Origin": "*",
-//         },
-//         body: JSON.stringify({
-//           error: "Invalid file upload",
-//           displayMessage: "Failed to process uploaded file. Please try again.",
-//           details: "Error parsing multipart form data",
-//         }),
-//       };
-//     }
+  // Default to JPEG
+  return { extension: "jpg", mimeType: "image/jpeg" };
+};
 
-//     // Validate file upload
-//     if (
-//       !parsedEvent.files ||
-//       !parsedEvent.files.length ||
-//       !parsedEvent.files[0]
-//     ) {
-//       return {
-//         statusCode: 400,
-//         headers: {
-//           "Content-Type": "application/json",
-//           "Access-Control-Allow-Origin": "*",
-//         },
-//         body: JSON.stringify({
-//           error: "No file provided",
-//           displayMessage: "Please select a photo to upload.",
-//           details: "No file found in the request",
-//         }),
-//       };
-//     }
+export const handler = async (
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> => {
+  console.log("INFO: Received event:", JSON.stringify(event, null, 2));
 
-//     const file = parsedEvent.files[0];
+  try {
+    const headers = event.headers as unknown as RequestHeaders;
 
-//     // Validate file type
-//     const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif"];
-//     if (!allowedTypes.includes(file.contentType)) {
-//       return {
-//         statusCode: 400,
-//         headers: {
-//           "Content-Type": "application/json",
-//           "Access-Control-Allow-Origin": "*",
-//         },
-//         body: JSON.stringify({
-//           error: "Invalid file type",
-//           displayMessage:
-//             "Please upload a valid image file (JPEG, PNG, or GIF).",
-//           details: `File type \${file.contentType} is not allowed`,
-//         }),
-//       };
-//     }
+    const { currentLevel, gameId, currentTeamLevel, userMessages } =
+      await fetchBaseData(headers);
 
-//     // Validate file size (e.g., max 10MB)
-//     const maxSize = 10 * 1024 * 1024; // 10MB
-//     if (file.content.length > maxSize) {
-//       return {
-//         statusCode: 400,
-//         headers: {
-//           "Content-Type": "application/json",
-//           "Access-Control-Allow-Origin": "*",
-//         },
-//         body: JSON.stringify({
-//           error: "File too large",
-//           displayMessage: "Please upload a photo smaller than 10MB.",
-//           details: `File size \${file.content.length} exceeds maximum allowed size`,
-//         }),
-//       };
-//     }
+    // Parse request body
+    if (!event.body) {
+      console.error("ERROR: Request body is missing or empty");
+      throw new Error("Request body is required");
+    }
 
-//     // Generate unique filename
-//     const fileExtension = file.filename.split(".").pop() || "jpg";
-//     const fileName = `team-photos/\${headers['team-id']}/\${uuidv4()}.\${fileExtension}`;
+    const requestBody: UploadPhotoRequest = JSON.parse(event.body);
+    console.log("INFO: Parsed request body:", {
+      filename: requestBody.filename,
+      contentType: requestBody.contentType,
+      size: requestBody.size,
+      photoDataLength: requestBody.photo?.length || 0,
+    });
 
-//     // Upload to S3
-//     try {
-//       const uploadParams = {
-//         Bucket: BUCKET_NAME,
-//         Key: fileName,
-//         Body: file.content,
-//         ContentType: file.contentType,
-//         Metadata: {
-//           "team-id": headers["team-id"] as string,
-//           "user-id": headers["user-id"] as string,
-//           "upload-timestamp": new Date().toISOString(),
-//         },
-//       };
+    // Validate required fields
+    if (!requestBody.photo) {
+      throw new Error("Photo data is required");
+    }
 
-//       const uploadResult = await s3.upload(uploadParams).promise();
+    // Convert base64 to buffer
+    const fileBuffer = Buffer.from(requestBody.photo, "base64");
+    console.log(
+      `INFO: Converted base64 to buffer, size: ${fileBuffer.length} bytes`
+    );
 
-//       // Here you might want to save the photo URL to your database
-//       // associated with the team and user
+    // Detect image format
+    const { extension, mimeType } = detectImageFormat(
+      requestBody.photo,
+      requestBody.contentType
+    );
+    console.log(`INFO: Detected image format: ${extension} (${mimeType})`);
 
-//       const response: UploadResponse = {
-//         success: true,
-//         message: "Photo uploaded successfully",
-//         photoUrl: uploadResult.Location,
-//       };
+    // Generate unique identifiers and timestamps
+    console.log("INFO: Generating unique identifiers");
+    const photoId = uuidv4();
+    const epochTimestamp = Math.floor(Date.now() / 1000);
 
-//       return {
-//         statusCode: 200,
-//         headers: {
-//           "Content-Type": "application/json",
-//           "Access-Control-Allow-Origin": "*",
-//         },
-//         body: JSON.stringify(response),
-//       };
-//     } catch (uploadError) {
-//       console.error("Error uploading to S3:", uploadError);
-//       return {
-//         statusCode: 500,
-//         headers: {
-//           "Content-Type": "application/json",
-//           "Access-Control-Allow-Origin": "*",
-//         },
-//         body: JSON.stringify({
-//           error: "Upload failed",
-//           displayMessage:
-//             "Failed to upload photo. Please try again or contact support.",
-//           details: "Error uploading file to storage",
-//         }),
-//       };
-//     }
-//   } catch (error) {
-//     console.error("Unexpected error in upload-photo handler:", error);
+    // Generate S3 filename
+    const filename = `${currentTeamLevel.team_id}/${currentTeamLevel.level_id}/${epochTimestamp}_${photoId}.${extension}`;
+    console.log(`INFO: Generated S3 filename: ${filename}`);
 
-//     return {
-//       statusCode: 500,
-//       headers: {
-//         "Content-Type": "application/json",
-//         "Access-Control-Allow-Origin": "*",
-//       },
-//       body: JSON.stringify({
-//         error: "Internal server error",
-//         displayMessage:
-//           "An unexpected error occurred. Please try again or contact support.",
-//         details: error instanceof Error ? error.message : "Unknown error",
-//       }),
-//     };
-//   }
-// };
+    // Check environment variables
+    const photoBucket = process.env.PHOTO_BUCKET;
+    if (!photoBucket) {
+      console.error("ERROR: PHOTO_BUCKET environment variable not set");
+      throw new Error("PHOTO_BUCKET environment variable is required");
+    }
+
+    console.log(`INFO: Using S3 bucket: ${photoBucket}`);
+
+    // Upload to S3
+    try {
+      console.log("INFO: Starting S3 upload...");
+      const putCommand = new PutObjectCommand({
+        Bucket: photoBucket,
+        Key: filename,
+        Body: fileBuffer,
+        ContentType: mimeType,
+      });
+
+      await s3Client.send(putCommand);
+      console.log("INFO: S3 upload successful");
+    } catch (error) {
+      console.error("ERROR: S3 upload failed:", error);
+      throw new Error(
+        `Failed to upload photo to S3: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+
+    // Save photo metadata to DynamoDB
+    console.log("INFO: Saving photo metadata to DynamoDB...");
+    await PhotoOperations.create({
+      game_id: gameId,
+      team_id: currentTeamLevel.team_id,
+      level_id: currentTeamLevel.level_id,
+      user_id: headers["user-id"],
+      url: `https://${photoBucket}.s3.amazonaws.com/${filename}`,
+    });
+
+    console.log("INFO: Photo metadata saved to DynamoDB");
+
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        success: true,
+        message: "Photo uploaded successfully",
+        photo: {
+          id: photoId,
+          url: `https://${photoBucket}.s3.amazonaws.com/${filename}`,
+          format: extension,
+        },
+      }),
+    };
+  } catch (error) {
+    console.error("ERROR: Unexpected top-level error:", error);
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "Internal server error",
+      }),
+    };
+  }
+};

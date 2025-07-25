@@ -172,31 +172,30 @@ export class ApiResources extends Construct {
       new cdk.aws_apigateway.LambdaIntegration(pingCoordinatesLambda);
     pingCoordinatesResource.addMethod("POST", pingCoordinatesLambdaIntegration);
 
-    // /api/upload-photo resource
-    // const uploadPhotoResource = apiResource.addResource("upload-photo");
-    // const uploadPhotoLambda = new NodejsFunction(this, "UploadPhotoLambda", {
-    //   runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
-    //   entry: "lambda/src/api/uploadPhoto.ts",
-    //   handler: "handler",
-    //   bundling: {
-    //     externalModules: ["@aws-sdk/*"],
-    //     nodeModules: [],
-    //   },
-    //   timeout: cdk.Duration.seconds(30),
-    //   environment: {
-    //     DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
-    //     PHOTO_BUCKET: props.photoBucket.bucketName,
-    //   },
-    //   logGroup: new cdk.aws_logs.LogGroup(this, "UploadPhotoLogGroup", {
-    //     logGroupName: `UploadPhotoLambdaLogGroup-${props.uniqueId}`,
-    //     retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
-    //     removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
-    //   }),
-    // });
-
-    // const uploadPhotoLambdaIntegration =
-    //   new cdk.aws_apigateway.LambdaIntegration(uploadPhotoLambda);
-    // props.photoBucket.grantReadWrite(uploadPhotoLambda);
-    // uploadPhotoResource.addMethod("POST", uploadPhotoLambdaIntegration);
+    const uploadPhotoResource = apiResource.addResource("upload-photo");
+    const uploadPhotoLambda = new NodejsFunction(this, "UploadPhotoLambda", {
+      runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
+      entry: "lambda/src/api/uploadPhoto.ts",
+      handler: "handler",
+      bundling: {
+        externalModules: ["@aws-sdk/*"],
+        nodeModules: [],
+      },
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
+        PHOTO_BUCKET: props.photoBucket.bucketName,
+      },
+      logGroup: new cdk.aws_logs.LogGroup(this, "UploadPhotoLogGroup", {
+        logGroupName: `UploadPhotoLambdaLogGroup-${props.uniqueId}`,
+        retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
+        removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+    props.duckHuntTable.grantReadWriteData(uploadPhotoLambda);
+    props.photoBucket.grantReadWrite(uploadPhotoLambda);
+    const uploadPhotoLambdaIntegration =
+      new cdk.aws_apigateway.LambdaIntegration(uploadPhotoLambda);
+    uploadPhotoResource.addMethod("POST", uploadPhotoLambdaIntegration);
   }
 }

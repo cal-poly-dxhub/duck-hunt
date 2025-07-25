@@ -260,8 +260,10 @@ export const handler = async (
       a.level_id.localeCompare(b.level_id)
     );
     const completedTeamLevels = sortedTeamLevels.filter(
-      (level) => level.completed_at !== null
+      (level) => level.completed_at !== undefined
     );
+
+    console.log("INFO: Completed team levels:", completedTeamLevels);
 
     // check if most recently completed level has a photo in the database
     if (completedTeamLevels.length > 0) {
