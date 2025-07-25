@@ -117,6 +117,7 @@ export const handler = async (
       userId: headers["user-id"] as UUID,
       teamId: headers["team-id"] as UUID,
       currentLevel,
+      userMessage: eventBody.message,
     });
   } catch (error) {
     console.error("ERROR: Failed to process request:", error);

@@ -98,6 +98,12 @@ export const handler = async (
       userId: headers["user-id"] as UUID,
       teamId: headers["team-id"] as UUID,
       currentLevel,
+      userMessage: {
+        id: v4() as UUID,
+        role: MessageRole.User,
+        content: "Hello. Introduce yourself and your job.",
+        createdAt: new Date(),
+      },
     });
   } catch (error) {
     console.error("ERROR: Failed to process request:", error);

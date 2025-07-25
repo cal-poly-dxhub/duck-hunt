@@ -15,6 +15,12 @@ export interface RespondByLevelTimeProps {
   userId: UUID;
   teamId: UUID;
   currentLevel: Level;
+  userMessage: {
+    id: UUID;
+    role: MessageRole.User;
+    content: string;
+    createdAt: Date;
+  };
 }
 
 /**
@@ -28,6 +34,7 @@ export const respondByLevelTime = async ({
   userId,
   teamId,
   currentLevel,
+  userMessage,
 }: RespondByLevelTimeProps): Promise<APIGatewayProxyResult> => {
   console.log("INFO: Responding by level time (message response) with:", {
     gameId,
@@ -70,12 +77,7 @@ export const respondByLevelTime = async ({
       levelId: currentLevel.id as UUID,
       userId,
       teamId,
-      newUserMessage: {
-        id: v4() as UUID,
-        role: MessageRole.User,
-        content: "Hello. Introduce yourself and your job.",
-        createdAt: new Date(),
-      },
+      newUserMessage: userMessage,
     });
 
     return {

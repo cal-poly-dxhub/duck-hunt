@@ -65,7 +65,7 @@ export class ApiResources extends Construct {
     props.duckHuntTable.grantReadWriteData(messageLambda);
     messageLambda.addToRolePolicy(
       new cdk.aws_iam.PolicyStatement({
-        actions: ["bedrock:InvokeModel"],
+        actions: ["bedrock:InvokeModel", "bedrock:ApplyGuardrail"],
         resources: ["*"],
       })
     );
@@ -97,7 +97,7 @@ export class ApiResources extends Construct {
     props.duckHuntTable.grantReadWriteData(levelLambda);
     levelLambda.addToRolePolicy(
       new cdk.aws_iam.PolicyStatement({
-        actions: ["bedrock:InvokeModel"],
+        actions: ["bedrock:InvokeModel", "bedrock:ApplyGuardrail"],
         resources: ["*"],
       })
     );
@@ -129,7 +129,7 @@ export class ApiResources extends Construct {
     props.duckHuntTable.grantReadWriteData(clearChatLambda);
     clearChatLambda.addToRolePolicy(
       new cdk.aws_iam.PolicyStatement({
-        actions: ["bedrock:InvokeModel"],
+        actions: ["bedrock:InvokeModel", "bedrock:ApplyGuardrail"],
         resources: ["*"],
       })
     );
@@ -162,12 +162,6 @@ export class ApiResources extends Construct {
       }
     );
     props.duckHuntTable.grantReadWriteData(pingCoordinatesLambda);
-    pingCoordinatesLambda.addToRolePolicy(
-      new cdk.aws_iam.PolicyStatement({
-        actions: ["bedrock:InvokeModel"],
-        resources: ["*"],
-      })
-    );
     const pingCoordinatesLambdaIntegration =
       new cdk.aws_apigateway.LambdaIntegration(pingCoordinatesLambda);
     pingCoordinatesResource.addMethod("POST", pingCoordinatesLambdaIntegration);
