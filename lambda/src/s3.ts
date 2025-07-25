@@ -1,20 +1,20 @@
 import {
-  S3Client,
-  GetObjectCommand,
-  PutObjectCommand,
-  DeleteObjectCommand,
-  ListObjectsV2Command,
-  HeadObjectCommand,
   CopyObjectCommand,
-  GetObjectCommandInput,
-  PutObjectCommandInput,
-  DeleteObjectCommandInput,
-  ListObjectsV2CommandInput,
-  HeadObjectCommandInput,
   CopyObjectCommandInput,
+  DeleteObjectCommand,
+  DeleteObjectCommandInput,
+  GetObjectCommand,
+  GetObjectCommandInput,
+  HeadObjectCommand,
+  HeadObjectCommandInput,
+  ListObjectsV2Command,
+  ListObjectsV2CommandInput,
+  PutObjectCommand,
+  PutObjectCommandInput,
+  S3Client,
 } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Upload } from "@aws-sdk/lib-storage";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 // Environment variables
 export const GAME_CONFIG_BUCKET =

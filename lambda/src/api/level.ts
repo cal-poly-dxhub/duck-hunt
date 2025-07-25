@@ -1,16 +1,17 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { S3Client } from "@aws-sdk/client-s3";
-import { invokeBedrock, InvokeBedrockProps } from "../invokeBedrock";
-import { validateUUID } from "@shared/scripts";
 import {
   corsHeaders,
-  LevelRequestBody,
   LevelResponseBody,
   MessageRole,
   RequestHeaders,
   ResponseError,
+  UUID,
 } from "@shared/types";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import { invokeBedrockPersistToDynamo } from "src/invokeBedrock";
+import { v4 } from "uuid";
+import { fetchBaseData } from "./fetchBaseData";
 
 const s3Client = new S3Client({});
 const dynamoClient = new DynamoDBClient({});
@@ -29,44 +30,11 @@ export const handler = async (
 
   // validate request headers
   const headers = event.headers as unknown as RequestHeaders;
-
-  // validate headers["user-id"] and headers["team-id"]
-  if (!validateUUID(headers["user-id"])) {
-    console.error(
-      "ERROR: Invalid user ID in request headers:",
-      headers["user-id"]
-    );
-    return {
-      statusCode: 400,
-      headers: corsHeaders,
-      body: JSON.stringify({
-        error: "Invalid user-id header.",
-        displayMessage: "The provided user ID is invalid. Contact support.",
-        details: `Invalid user ID: ${headers["user-id"]}`,
-      } as ResponseError),
-    };
-  } else if (!validateUUID(headers["team-id"])) {
-    console.error(
-      "ERROR: Invalid team ID in request headers:",
-      headers["team-id"]
-    );
-    return {
-      statusCode: 400,
-      headers: corsHeaders,
-      body: JSON.stringify({
-        error: "Invalid team-id header.",
-        displayMessage:
-          "The provided team ID is invalid. Try scanning your team duck.",
-        details: `Invalid team ID: ${headers["team-id"]}`,
-      } as ResponseError),
-    };
-  }
-
   try {
-    // query dynamo for user
-    // query dynamo for team
+    const { currentLevel, gameId, currentTeamLevel, userMessages } =
+      await fetchBaseData(headers);
 
-    const requestBody: LevelRequestBody = JSON.parse(event.body || "{}");
+    // TODO: acual level logic
 
     // query dynamo for team's current level
     // if id matches a previous level, return nothing
@@ -78,37 +46,43 @@ export const handler = async (
     // if latest message is from user, remove from message history
     // if messages do not alternate roles, fix
 
-    const initialLevelMessage = {
-      id: 0,
-      role: MessageRole.User,
+    if (userMessages.length > 0) {
+      const responseBody: LevelResponseBody = {
+        currentLevel: crypto.randomUUID(),
+        messageHistory: userMessages,
+        requiresPhoto: true,
+      };
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify(responseBody),
+      };
+    }
+
+    const newUserMessage = {
+      id: v4() as UUID,
+      role: MessageRole.User as MessageRole.User,
       content: "Hello. Introduce yourself and your job.",
       createdAt: new Date(),
     };
 
-    const invokeBedrockProps: InvokeBedrockProps = {
-      levelId: "00000000-0000-0000-0000-000000000000", // get from dynamo
-      messageHistory: [initialLevelMessage],
-    };
-    const { bedrockResponseMessage, bedrockFailed } = await invokeBedrock(
-      invokeBedrockProps
-    );
-
-    if (bedrockFailed) {
-      console.error("Bedrock failed");
-      // TODO: handle bedrock failed?
-    }
-
-    // stub response
-    const responseBody: LevelResponseBody = {
-      currentLevel: crypto.randomUUID(),
-      message: bedrockResponseMessage,
-      requiresPhoto: true,
-    };
+    const { bedrockResponseMessage } = await invokeBedrockPersistToDynamo({
+      gameId: gameId,
+      levelId: currentLevel.id as UUID,
+      userId: headers["user-id"] as UUID,
+      teamId: headers["team-id"] as UUID,
+      newUserMessage,
+    });
 
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify(responseBody),
+      body: JSON.stringify({
+        messageHistory: [newUserMessage, bedrockResponseMessage],
+        currentLevel: currentLevel.id as UUID,
+        requiresPhoto: false,
+      } as LevelResponseBody),
     };
   } catch (error) {
     console.error("ERROR: Failed to process request:", error);

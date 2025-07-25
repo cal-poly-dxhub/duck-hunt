@@ -30,7 +30,7 @@ export enum MessageRole {
 }
 
 export interface Message<T extends MessageRole = MessageRole> {
-  id: number;
+  id: UUID;
   role: T;
   content: string;
   createdAt: Date;
@@ -57,7 +57,7 @@ export interface LevelRequestBody {
 // response body schema for /level
 export interface LevelResponseBody {
   currentLevel: string;
-  message: Message<MessageRole.Assistant>;
+  messageHistory: Array<Message>;
   requiresPhoto: boolean;
 }
 

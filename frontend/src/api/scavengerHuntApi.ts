@@ -4,7 +4,9 @@ import {
   Message,
   MessageResponseBody,
   MessageRole,
+  UUID,
 } from "@shared/types";
+import { v4 } from "uuid";
 import { apiRequest } from "./apiRequest";
 
 // /message
@@ -40,7 +42,7 @@ const message = async (
     console.error("Error in message function:", error);
     return {
       message: {
-        id: userMessage.id + 1,
+        id: v4() as UUID,
         role: MessageRole.Assistant,
         content:
           typeof (error as { message?: string })?.message === "string"
@@ -56,6 +58,7 @@ const message = async (
 // /level
 const level = async (levelId: string | null): Promise<LevelResponseBody> => {
   try {
+    console.log("INFO: Fetching level data with levelId:", levelId);
     if (levelId !== undefined && !validateUUID(levelId)) {
       console.error("Level ID not valid");
       throw new Error(
@@ -80,17 +83,18 @@ const level = async (levelId: string | null): Promise<LevelResponseBody> => {
   } catch (error) {
     console.error("Error in atLevel function:", error);
     return {
-      currentLevel: "00000000-0000-0000-0000-000000000000",
-      message: {
-        id: 2,
-        content:
-          typeof (error as { message?: string })?.message === "string"
-            ? (error as { message: string }).message
-            : "Failed to retrieve level data. Please try later or contact support.",
-        role: MessageRole.Assistant,
-        createdAt: new Date(),
-      },
-
+      currentLevel: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      messageHistory: [
+        {
+          id: v4() as UUID,
+          content:
+            typeof (error as { message?: string })?.message === "string"
+              ? (error as { message: string }).message
+              : "Failed to retrieve level data. Please try later or contact support.",
+          role: MessageRole.Assistant,
+          createdAt: new Date(),
+        },
+      ],
       requiresPhoto: false,
     };
   }
@@ -113,7 +117,7 @@ const clearChat = async (): Promise<MessageResponseBody> => {
     console.error("Error in clearChat function:", error);
     return {
       message: {
-        id: 1,
+        id: v4() as UUID,
         role: MessageRole.Assistant,
         content:
           typeof (error as { message?: string })?.message === "string"

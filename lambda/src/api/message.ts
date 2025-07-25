@@ -1,19 +1,15 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { S3Client } from "@aws-sdk/client-s3";
-import { invokeBedrock, InvokeBedrockProps } from "../invokeBedrock";
-import { validateUUID } from "@shared/scripts";
 import {
   corsHeaders,
-  MessageRequestBody,
   MessageResponseBody,
   MessageRole,
   RequestHeaders,
   ResponseError,
+  UUID,
 } from "@shared/types";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-
-const s3Client = new S3Client({});
-const dynamoClient = new DynamoDBClient({});
+import { v4 } from "uuid";
+import { invokeBedrockPersistToDynamo } from "../invokeBedrock";
+import { fetchBaseData } from "./fetchBaseData";
 
 /**
  * /message lambda handler
@@ -30,112 +26,130 @@ export const handler = async (
 
   // validate request headers
   const headers = event.headers as unknown as RequestHeaders;
+  const eventBody = JSON.parse(event.body || "{}");
 
-  // validate headers["user-id"] and headers["team-id"]
-  if (!validateUUID(headers["user-id"])) {
-    console.error(
-      "ERROR: Invalid user ID in request headers:",
-      headers["user-id"]
-    );
+  if (!eventBody.message) {
+    console.error("ERROR: No message found in request body.");
     return {
       statusCode: 400,
       headers: corsHeaders,
       body: JSON.stringify({
-        error: "Invalid user-id header.",
-        displayMessage: "The provided user ID is invalid. Contact support.",
-        details: `Invalid user ID: ${headers["user-id"]}`,
-      } as ResponseError),
-    };
-  } else if (!validateUUID(headers["team-id"])) {
-    console.error(
-      "ERROR: Invalid team ID in request headers:",
-      headers["team-id"]
-    );
-    return {
-      statusCode: 400,
-      headers: corsHeaders,
-      body: JSON.stringify({
-        error: "Invalid team-id header.",
-        displayMessage:
-          "The provided team ID is invalid. Try scanning your team duck.",
-        details: `Invalid team ID: ${headers["team-id"]}`,
+        error: "No message found.",
+        displayMessage: "Please provide a message.",
+        details: "No message found in request body.",
       } as ResponseError),
     };
   }
 
   try {
-    // query dynamo for user
-    // query dynamo for team
-    // query dynamo for team's current level
+    const { currentLevel, gameId, currentTeamLevel, userMessages } =
+      await fetchBaseData(headers);
 
-    // check how long since they started the level
-    // if >10 min, return easy hint
-    // if >15 min, return maps link
+    console.log(
+      "INFO: Fetched base data:",
+      JSON.stringify({ currentTeamLevel, userMessages }, null, 2)
+    );
 
-    // query dynamo for user's messages at this level
-
-    // if latest message is from user, remove from message history
-    // if messages do not alternate roles, fix
-
-    const requestBody: MessageRequestBody = JSON.parse(event.body || "{}");
-    if (!requestBody.message || !requestBody.message.content) {
+    if (!currentTeamLevel) {
+      console.error("ERROR: No current team level found for team.");
       return {
         statusCode: 400,
         headers: corsHeaders,
         body: JSON.stringify({
-          error: "Invalid request body.",
-          displayMessage: "Please provide a valid message.",
-          details: "Message content is required.",
+          error: "No current team level found.",
+          displayMessage:
+            "You have completed all levels. Contact support for assistance.",
+          details: "No current team level found for the team.",
         } as ResponseError),
       };
     }
 
-    // build prompt from s3
-    // invoke bedrock with prompt and user's (current level, not deleted) message history
-
-    // process bedrock response
-    // save response message to dynamo
-
-    // TODO: replace with actual message history
-    const STUBMessageHistory = [
-      {
-        id: 0,
-        role: MessageRole.User,
-        content: "Hello. Introduce yourself and your job.",
-        createdAt: new Date(),
-      },
-      {
-        id: 1,
-        role: MessageRole.Assistant,
-        content: "Hello, I am an assistant for duck hunt.",
-        createdAt: new Date(),
-      },
-    ];
-
-    const invokeBedrockProps: InvokeBedrockProps = {
-      levelId: "00000000-0000-0000-0000-000000000000", // get from dyanmo
-      messageHistory: STUBMessageHistory,
-    };
-    const { bedrockResponseMessage, bedrockFailed } = await invokeBedrock(
-      invokeBedrockProps
-    );
-
-    if (bedrockFailed) {
-      console.error("Bedrock failed");
-      // TODO: handle bedrock failed?
+    if (!currentLevel) {
+      console.error("ERROR: No current level found for team.");
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          error: "No current level found.",
+          displayMessage:
+            "You have completed all levels. Contact support for assistance.",
+          details: "No current level found for the team.",
+        } as ResponseError),
+      };
     }
 
-    // stub response
-    const responseBody: MessageResponseBody = {
-      message: bedrockResponseMessage,
-      mapLink: null,
-    };
+    if (
+      new Date(currentTeamLevel.updated_at).getTime() <
+      Date.now() - 10 * 60 * 1000
+    ) {
+      // been on level for <10 minutes
+      const { bedrockResponseMessage } = await invokeBedrockPersistToDynamo({
+        gameId: gameId,
+        levelId: currentLevel.id as UUID,
+        userId: headers["user-id"] as UUID,
+        teamId: headers["team-id"] as UUID,
+        newUserMessage: eventBody.message,
+      });
 
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify(responseBody),
-    };
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          message: {
+            id: v4(),
+            role: MessageRole.Assistant,
+            content: bedrockResponseMessage.content,
+            createdAt: new Date(),
+          },
+          mapLink: null,
+        } as MessageResponseBody),
+      };
+    } else if (
+      new Date(currentTeamLevel.updated_at).getTime() <
+      Date.now() - 15 * 60 * 1000
+    ) {
+      // been on level for >10 minutes, <15 minutes
+      console.warn(
+        "WARN: User has been on the level for more than 10 minutes."
+      );
+      // Pick a random easy clue from currentLevel.easyClues
+      const easyClues = currentLevel.easyClues || [];
+      const randomClue =
+        easyClues[Math.floor(Math.random() * easyClues.length)];
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          message: {
+            id: v4(),
+            role: MessageRole.Assistant,
+            content: randomClue,
+            createdAt: new Date(),
+          },
+          mapLink: null,
+        } as MessageResponseBody),
+      };
+    } else {
+      // been on level for >15 minutes
+      console.warn(
+        "WARN: User has been on the level for more than 15 minutes."
+      );
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          message: {
+            id: v4(),
+            role: MessageRole.Assistant,
+            content:
+              "You have been on this level for a while. Here's a link to the maps to help you out.",
+            createdAt: new Date(),
+          },
+          mapLink: currentLevel.mapLink || null,
+        } as MessageResponseBody),
+      };
+    }
   } catch (error) {
     console.error("ERROR: Failed to process request:", error);
     return {

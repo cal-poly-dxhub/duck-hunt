@@ -1,11 +1,10 @@
+import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { S3Event } from "aws-lambda";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
-import { v4 as uuidv4, validate as validateUUID } from "uuid";
+import { v4 as uuidv4 } from "uuid";
 import { Game, GameOperations } from "./dynamo/game";
-import { Team, TeamOperations } from "./dynamo/team";
 import { Level, LevelOperations } from "./dynamo/level";
+import { Team, TeamOperations } from "./dynamo/team";
 import { TeamLevelOperations } from "./dynamo/teamLevel";
-import { BaseEntity } from "./dynamo";
 
 const s3Client = new S3Client({});
 

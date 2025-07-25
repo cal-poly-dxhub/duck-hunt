@@ -1,18 +1,18 @@
 import {
+  DeleteCommand,
   GetCommand,
   PutCommand,
   UpdateCommand,
-  DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
 import {
   BaseEntity,
   docClient,
-  getCurrentTimestamp,
   DUCK_HUNT_TABLE_NAME,
+  getCurrentTimestamp,
 } from ".";
-import { Team } from "./team";
 import { Level } from "./level";
+import { Team } from "./team";
 
 export interface Game extends BaseEntity {
   levelsInGame?: number;

@@ -1,17 +1,15 @@
 import {
-  BaseEntity,
-  docClient,
-  getCurrentTimestamp,
-  DUCK_HUNT_TABLE_NAME,
-} from ".";
-import {
-  GetCommand,
+  DeleteCommand,
   PutCommand,
   QueryCommand,
   UpdateCommand,
-  DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { v4 as uuidv4 } from "uuid";
+import {
+  BaseEntity,
+  docClient,
+  DUCK_HUNT_TABLE_NAME,
+  getCurrentTimestamp,
+} from ".";
 
 export interface User extends BaseEntity {
   team_id: string;
@@ -20,10 +18,9 @@ export interface User extends BaseEntity {
 // USER Operations
 export class UserOperations {
   static async create(
-    userData: Omit<User, "id" | "created_at" | "updated_at">
+    userData: Omit<User, "created_at" | "updated_at">
   ): Promise<User> {
     const user: User = {
-      id: uuidv4(),
       created_at: getCurrentTimestamp(),
       updated_at: getCurrentTimestamp(),
       ...userData,
