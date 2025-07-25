@@ -59,7 +59,7 @@ const buildSystemPrompt = (levelData: any): string => {
     )}.`;
   }
 
-  systemPrompt += ` Stay in character while helping players with their scavenger hunt adventure. Be engaging and provide helpful guidance without giving away answers too easily.`;
+  systemPrompt += ` Stay in character while helping players with their scavenger hunt adventure. Be engaging and provide helpful guidance without giving away answers too easily. Keep responses relatively short.`;
 
   return systemPrompt;
 };
@@ -84,7 +84,7 @@ const invokeBedrock = async ({
     }
 
     const systemPrompt = buildSystemPrompt(levelData);
-    const maxTokens = levelData.max_tokens || 512;
+    const maxTokens = levelData.max_tokens || 128;
 
     const messages = messageHistory.map((msg) => ({
       role: msg.role === MessageRole.User ? "user" : "assistant",

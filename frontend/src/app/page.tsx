@@ -53,6 +53,13 @@ export default function Chat() {
     isLoading: gameLoading,
   } = useGame();
 
+  const loadingMessage: Message<MessageRole.Assistant> = {
+    id: v4() as UUID,
+    content: "Loading...",
+    role: MessageRole.Assistant,
+    createdAt: new Date(),
+  };
+
   const typeMessage = async (message: Message) => {
     for (let i = 0; i <= message.content.length; i++) {
       setTypingMessages((prev) => ({
@@ -63,6 +70,7 @@ export default function Chat() {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
     }
+
     setTypingMessages((prev) => {
       const newState = { ...prev };
       delete newState[message.id];
@@ -80,13 +88,6 @@ export default function Chat() {
       id: v4() as UUID,
       content: userMessage,
       role: MessageRole.User,
-      createdAt: new Date(),
-    };
-
-    const loadingMessage: Message<MessageRole.Assistant> = {
-      id: v4() as UUID,
-      content: "Loading",
-      role: MessageRole.Assistant,
       createdAt: new Date(),
     };
 
@@ -118,9 +119,21 @@ export default function Chat() {
   };
 
   const handleClearChat = async () => {
+    setLoading(true);
+    setInput("");
+    setMessages([
+      {
+        id: v4() as UUID,
+        content: "Loading...",
+        role: MessageRole.Assistant,
+        createdAt: new Date(),
+      },
+    ]);
+
     const { message } = await scavengerHuntApi.clearChat();
+
     setMessages([message]);
-    setTypingMessages({});
+    setLoading(false);
   };
 
   const searchParams = useSearchParams();
@@ -167,6 +180,7 @@ export default function Chat() {
   // fetch every page refresh
   useEffect(() => {
     const handleCheckLocation = async () => {
+      setMessages([loadingMessage]);
       const { currentTeamLevel, messageHistory, requiresPhoto } =
         await scavengerHuntApi.level(levelIdFromUrl);
 

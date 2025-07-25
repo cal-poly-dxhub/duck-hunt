@@ -1,4 +1,4 @@
-import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
 import {
   BaseEntity,
@@ -100,6 +100,29 @@ export class TeamLevelOperations {
     return teamLevels.Items as TeamLevel[];
   }
 
+  static async markLevelAsStarted(
+    teamId: string,
+    levelId: string
+  ): Promise<void> {
+    const currentTimestamp = getCurrentTimestamp();
+
+    await docClient.send(
+      new UpdateCommand({
+        TableName: DUCK_HUNT_TABLE_NAME,
+        Key: {
+          PK: `TEAM#${teamId}`,
+          SK: `LEVEL#${levelId}`,
+        },
+        UpdateExpression:
+          "SET started_at = :startedAt, updated_at = :updatedAt",
+        ExpressionAttributeValues: {
+          ":startedAt": currentTimestamp,
+          ":updatedAt": currentTimestamp,
+        },
+      })
+    );
+  }
+
   static async markLevelAsCompleted(
     teamId: string,
     levelId: string
@@ -107,16 +130,17 @@ export class TeamLevelOperations {
     const currentTimestamp = getCurrentTimestamp();
 
     await docClient.send(
-      new PutCommand({
+      new UpdateCommand({
         TableName: DUCK_HUNT_TABLE_NAME,
-        Item: {
+        Key: {
           PK: `TEAM#${teamId}`,
           SK: `LEVEL#${levelId}`,
-          GSI1PK: `LEVEL#${levelId}`,
-          GSI1SK: `TEAM#${teamId}`,
-          ItemType: "TEAM_LEVEL",
-          completed_at: currentTimestamp,
-          updated_at: currentTimestamp,
+        },
+        UpdateExpression:
+          "SET completed_at = :completedAt, updated_at = :updatedAt",
+        ExpressionAttributeValues: {
+          ":completedAt": currentTimestamp,
+          ":updatedAt": currentTimestamp,
         },
       })
     );

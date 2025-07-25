@@ -1,21 +1,131 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { S3Client } from "@aws-sdk/client-s3";
 import {
   corsHeaders,
   LevelResponseBody,
+  Message,
   MessageRole,
   RequestHeaders,
   ResponseError,
   UUID,
 } from "@shared/types";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import { TeamLevelOperations } from "src/dynamo/teamLevel";
+import { Level } from "src/dynamo/level";
+import { MessageOperations } from "src/dynamo/message";
+import { TeamLevel, TeamLevelOperations } from "src/dynamo/teamLevel";
 import { invokeBedrockPersistToDynamo } from "src/invokeBedrock";
 import { v4 } from "uuid";
 import { fetchBaseData } from "./fetchBaseData";
 
-const s3Client = new S3Client({});
-const dynamoClient = new DynamoDBClient({});
+interface RespondByLevelTimeLevelResponseProps {
+  gameId: UUID;
+  userId: UUID;
+  teamId: UUID;
+  messageHistory: Message<MessageRole>[];
+  currentTeamLevel: TeamLevel;
+  currentLevel: Level;
+}
+
+/**
+ * Respond to a level time event with the appropriate level response.
+ * @param param0 {RespondByLevelTimeLevelResponseProps}
+ * @returns {Promise<APIGatewayProxyResult>}
+ */
+const respondByLevelTimeLevelResponse = async ({
+  gameId,
+  userId,
+  teamId,
+  messageHistory,
+  currentTeamLevel,
+  currentLevel,
+}: RespondByLevelTimeLevelResponseProps): Promise<APIGatewayProxyResult> => {
+  const firstTeamMessageForCurrentLevel =
+    await MessageOperations.getFirstMessageForTeamAndLevel(
+      teamId,
+      currentLevel.id as UUID
+    );
+
+  if (
+    !firstTeamMessageForCurrentLevel ||
+    new Date(firstTeamMessageForCurrentLevel.createdAt).getTime() <
+      Date.now() - 10 * 60 * 1000
+  ) {
+    if (!firstTeamMessageForCurrentLevel) {
+      console.warn("WARN: No messages found for team at current level.");
+    }
+
+    // been on level for <10 minutes
+    const { bedrockResponseMessage } = await invokeBedrockPersistToDynamo({
+      gameId,
+      levelId: currentLevel.id as UUID,
+      userId,
+      teamId,
+      newUserMessage: {
+        id: v4() as UUID,
+        role: MessageRole.User,
+        content: "Hello. Introduce yourself and your job.",
+        createdAt: new Date(),
+      },
+    });
+
+    // sending bad message
+    const levelResponse: LevelResponseBody = {
+      currentTeamLevel: currentTeamLevel.id as UUID,
+      messageHistory: [...messageHistory, bedrockResponseMessage].slice(1), // omit first user message
+      requiresPhoto: false,
+      mapLink: null,
+    };
+
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify(levelResponse),
+    };
+  } else if (
+    new Date(firstTeamMessageForCurrentLevel.createdAt).getTime() <
+    Date.now() - 15 * 60 * 1000
+  ) {
+    // been on level for >10 minutes, <15 minutes
+    console.warn("WARN: User has been on the level for more than 10 minutes.");
+
+    // Pick a random easy clue from currentLevel.easyClues
+    const easyClues = currentLevel.easyClues || [];
+    const randomClue = easyClues[Math.floor(Math.random() * easyClues.length)];
+    const randomClueMessage: Message<MessageRole.Assistant> = {
+      id: v4() as UUID,
+      role: MessageRole.Assistant,
+      content: randomClue,
+      createdAt: new Date(),
+    };
+
+    const easyClueLevelResponse: LevelResponseBody = {
+      currentTeamLevel: currentTeamLevel.id as UUID,
+      messageHistory: [...messageHistory, randomClueMessage].slice(1), // omit first user message
+      requiresPhoto: false,
+      mapLink: null,
+    };
+
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify(easyClueLevelResponse),
+    };
+  } else {
+    // been on level for >15 minutes
+    console.warn("WARN: User has been on the level for more than 15 minutes.");
+
+    const mapLinkLevelResponse: LevelResponseBody = {
+      currentTeamLevel: currentLevel.id as UUID,
+      messageHistory: messageHistory.slice(1), // omit first user message
+      requiresPhoto: false,
+      mapLink: currentLevel.mapLink,
+    };
+
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify(mapLinkLevelResponse),
+    };
+  }
+};
 
 /**
  * /level lambda handler
@@ -49,47 +159,15 @@ export const handler = async (
         "INFO: No levelId provided in request body, returning current level data."
       );
 
-      if (userMessages.length > 0) {
-        return {
-          statusCode: 200,
-          headers: corsHeaders,
-          body: JSON.stringify({
-            messageHistory: userMessages,
-            currentTeamLevel: currentTeamLevel.id as UUID,
-            requiresPhoto: true,
-          } as LevelResponseBody),
-        };
-      }
-
-      const hardcodedMessage = {
-        id: v4() as UUID,
-        role: MessageRole.User as MessageRole.User,
-        content: "Hello. Introduce yourself and your job.",
-        createdAt: new Date(),
-      };
-
-      console.log(
-        "INFO: No messages found. Invoking Bedrock with hardcoded user message:",
-        hardcodedMessage
-      );
-
-      const { bedrockResponseMessage } = await invokeBedrockPersistToDynamo({
-        gameId: gameId as UUID,
-        levelId: currentLevel.id as UUID,
+      // cant use respondByLevelTime here because /level responds with LevelResponseBody
+      return respondByLevelTimeLevelResponse({
+        gameId,
         userId: headers["user-id"] as UUID,
         teamId: headers["team-id"] as UUID,
-        newUserMessage: hardcodedMessage,
+        messageHistory: userMessages,
+        currentTeamLevel,
+        currentLevel,
       });
-
-      return {
-        statusCode: 200,
-        headers: corsHeaders,
-        body: JSON.stringify({
-          messageHistory: [hardcodedMessage, bedrockResponseMessage],
-          currentTeamLevel: currentTeamLevel.id as UUID,
-          requiresPhoto: false,
-        } as LevelResponseBody),
-      };
     }
 
     const allTeamLevels = await TeamLevelOperations.getAllForTeam(
@@ -98,35 +176,13 @@ export const handler = async (
 
     console.log("INFO: All team levels:", allTeamLevels);
 
-    // TODO: actual level logic
-    // if id matches a previous level, return nothing
-    // if id matches current level, advance to next level
-    // if id matches future level, return error
-
     const completedLevels = allTeamLevels.filter(
       (level) => level.completed_at !== null
     );
 
-    if (completedLevels.some((level) => level.id === eventBody.levelId)) {
-      console.warn(
-        "WARN: Level ID already completed:",
-        eventBody.levelId,
-        "Completed levels:",
-        completedLevels.map((level) => level.id)
-      );
-
-      return {
-        statusCode: 208,
-        headers: corsHeaders,
-        body: JSON.stringify({
-          messageHistory: userMessages,
-          currentTeamLevel: currentTeamLevel.id as UUID,
-          requiresPhoto: false,
-        } as LevelResponseBody),
-      };
-    } else if (eventBody.levelId === currentLevel.id) {
+    if (eventBody.levelId === currentLevel.id) {
       console.log(
-        "INFO: Level ID matches current level, proceeding with level logic."
+        "INFO: Level ID matches current level, advancing team to next level."
       );
 
       // mark current level as completed
@@ -134,8 +190,6 @@ export const handler = async (
         headers["team-id"] as UUID,
         currentLevel.id as UUID
       );
-
-      console.log("INFO: Current level marked as completed:", currentLevel.id);
 
       const newCurrentLevel = await TeamLevelOperations.getNextLevel(
         headers["team-id"] as UUID,
@@ -165,53 +219,106 @@ export const handler = async (
           } as LevelResponseBody),
         };
       }
-    }
 
-    // if more levels to go
-    if (userMessages.length > 0) {
-      const responseBody: LevelResponseBody = {
-        currentTeamLevel: currentTeamLevel.id as UUID,
-        messageHistory: userMessages,
-        requiresPhoto: true,
+      await TeamLevelOperations.markLevelAsStarted(
+        headers["team-id"] as UUID,
+        newCurrentLevel.id as UUID
+      );
+
+      // otherwise, more levels to go
+      const newCurrentUserMessages = await MessageOperations.getForUserAtLevel(
+        headers["user-id"] as UUID,
+        newCurrentLevel.id as UUID
+      );
+
+      console.log(
+        "INFO: Found " +
+          newCurrentUserMessages.length +
+          " messages for user at new level."
+      );
+
+      if (newCurrentUserMessages.length > 0) {
+        const responseBody: LevelResponseBody = {
+          currentTeamLevel: currentTeamLevel.id as UUID,
+          messageHistory: newCurrentUserMessages.slice(1), // omit first user message
+          requiresPhoto: true,
+          mapLink: null,
+        };
+
+        return {
+          statusCode: 200,
+          headers: corsHeaders,
+          body: JSON.stringify(responseBody),
+        };
+      }
+
+      const newUserMessage = {
+        id: v4() as UUID,
+        role: MessageRole.User as MessageRole.User,
+        content: "Hello. Introduce yourself and your job.",
+        createdAt: new Date(),
       };
+
+      console.log(
+        "INFO: Invoking Bedrock with new user message:",
+        newUserMessage
+      );
+
+      const { bedrockResponseMessage } = await invokeBedrockPersistToDynamo({
+        gameId: gameId,
+        levelId: newCurrentLevel.id as UUID,
+        userId: headers["user-id"] as UUID,
+        teamId: headers["team-id"] as UUID,
+        newUserMessage,
+      });
 
       return {
         statusCode: 200,
         headers: corsHeaders,
-        body: JSON.stringify(responseBody),
+        body: JSON.stringify({
+          messageHistory: [bedrockResponseMessage],
+          currentTeamLevel: currentTeamLevel.id as UUID,
+          requiresPhoto: true,
+        } as LevelResponseBody),
+      };
+    } else if (
+      completedLevels.some((level) => level.id === eventBody.levelId)
+    ) {
+      console.warn(
+        "WARN: Level ID already completed:",
+        eventBody.levelId,
+        "Completed levels:",
+        completedLevels.map((level) => level.id)
+      );
+
+      // cant use respondByLevelTime here because /level responds with LevelResponseBody
+      return respondByLevelTimeLevelResponse({
+        gameId,
+        userId: headers["user-id"] as UUID,
+        teamId: headers["team-id"] as UUID,
+        messageHistory: userMessages,
+        currentTeamLevel,
+        currentLevel,
+      });
+    } else {
+      console.warn(
+        "WARN: Wrong level ID provided:",
+        eventBody.levelId,
+        "Current level:",
+        currentLevel.id
+      );
+
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          error: "Wrong level ID provided",
+          displayMessage:
+            "You are at the wrong location. Try to find a location that better matches the clues. Scan another duck to continue.",
+          details: `Received wrong level id: ${eventBody.levelId}`,
+        } as ResponseError),
       };
     }
-
-    const newUserMessage = {
-      id: v4() as UUID,
-      role: MessageRole.User as MessageRole.User,
-      content: "Hello. Introduce yourself and your job.",
-      createdAt: new Date(),
-    };
-
-    // TODO: is it reaching this?
-    console.log(
-      "INFO: Invoking Bedrock with new user message:",
-      newUserMessage
-    );
-
-    const { bedrockResponseMessage } = await invokeBedrockPersistToDynamo({
-      gameId: gameId,
-      levelId: currentLevel.id as UUID,
-      userId: headers["user-id"] as UUID,
-      teamId: headers["team-id"] as UUID,
-      newUserMessage,
-    });
-
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify({
-        messageHistory: [newUserMessage, bedrockResponseMessage],
-        currentTeamLevel: currentTeamLevel.id as UUID,
-        requiresPhoto: false,
-      } as LevelResponseBody),
-    };
   } catch (error) {
     console.error("ERROR: Failed to process request:", error);
     return {

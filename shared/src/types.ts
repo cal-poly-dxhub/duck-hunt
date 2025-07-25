@@ -58,6 +58,7 @@ export interface LevelRequestBody {
 export interface LevelResponseBody {
   currentTeamLevel: string;
   messageHistory: Array<Message>;
+  mapLink: string | null;
   requiresPhoto: boolean;
 }
 
