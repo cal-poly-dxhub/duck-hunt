@@ -66,6 +66,24 @@ export const fetchBaseData = async (
     };
   }
 
+  const currentTeamLevel = await TeamLevelOperations.getCurrentForTeam(
+    headers["team-id"]
+  );
+
+  if (!currentTeamLevel) {
+    console.error("ERROR: No current team level found for team.");
+    throw {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        error: "No current team level found.",
+        displayMessage:
+          "You have completed all levels. Contact support for assistance.",
+        details: "No current team level found for the team.",
+      } as ResponseError),
+    };
+  }
+
   let currentUser = await UserOperations.getById(headers["user-id"] as UUID);
 
   if (!currentUser) {
@@ -86,24 +104,6 @@ export const fetchBaseData = async (
         error: "User not found.",
         displayMessage: "User not found. Contact support.",
         details: `No user found for user ID: ${headers["user-id"]}`,
-      } as ResponseError),
-    };
-  }
-
-  const currentTeamLevel = await TeamLevelOperations.getCurrentForTeam(
-    headers["team-id"]
-  );
-
-  if (!currentTeamLevel) {
-    console.error("ERROR: No current team level found for team.");
-    throw {
-      statusCode: 400,
-      headers: corsHeaders,
-      body: JSON.stringify({
-        error: "No current team level found.",
-        displayMessage:
-          "You have completed all levels. Contact support for assistance.",
-        details: "No current team level found for the team.",
       } as ResponseError),
     };
   }

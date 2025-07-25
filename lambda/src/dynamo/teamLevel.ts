@@ -46,39 +46,35 @@ export class TeamLevelOperations {
   }
 
   static async getCurrentForTeam(teamId: string): Promise<TeamLevel | null> {
-    // query for all team levels for the team
-    const teamLevels = await docClient.send(
-      new QueryCommand({
-        TableName: DUCK_HUNT_TABLE_NAME,
-        KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
-        ExpressionAttributeValues: {
-          ":pk": `TEAM#${teamId}`,
-          ":sk": "LEVEL#",
-        },
-      })
-    );
+    try {
+      const response = await docClient.send(
+        new QueryCommand({
+          TableName: DUCK_HUNT_TABLE_NAME,
+          KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+          FilterExpression: "attribute_not_exists(completed_at)",
+          ExpressionAttributeValues: {
+            ":pk": `TEAM#${teamId}`,
+            ":sk": "LEVEL#",
+          },
+        })
+      );
 
-    if (!teamLevels.Items || teamLevels.Items.length === 0) {
-      throw new Error(`No team levels found for team: ${teamId}`);
+      console.log("INFO: Current team level response:", response);
+
+      if (!response.Items?.length) {
+        return null;
+      }
+
+      // Find the level with the minimum index (most efficient for small datasets)
+      const currentLevel = response.Items.reduce((min, current) =>
+        (current as TeamLevel).index < (min as TeamLevel).index ? current : min
+      ) as TeamLevel;
+
+      return currentLevel;
+    } catch (error) {
+      console.error(`Error fetching current level for team ${teamId}:`, error);
+      throw new Error(`Failed to get current level for team: ${teamId}`);
     }
-
-    // filter out completed levels
-    const currentLevels = (teamLevels.Items || []).filter(
-      (level) => !(level as TeamLevel).completed_at
-    );
-
-    if (currentLevels.length === 0) {
-      // all levels are completed
-      return null;
-    }
-
-    // sort team levels by index
-    const sortedLevels = currentLevels.sort(
-      (a, b) => (a as TeamLevel).index - (b as TeamLevel).index
-    );
-
-    // return the first level (current level)
-    return sortedLevels[0] as TeamLevel;
   }
 
   static async getAllForTeam(teamId: string): Promise<TeamLevel[]> {
@@ -98,29 +94,6 @@ export class TeamLevelOperations {
     }
 
     return teamLevels.Items as TeamLevel[];
-  }
-
-  static async markLevelAsStarted(
-    teamId: string,
-    levelId: string
-  ): Promise<void> {
-    const currentTimestamp = getCurrentTimestamp();
-
-    await docClient.send(
-      new UpdateCommand({
-        TableName: DUCK_HUNT_TABLE_NAME,
-        Key: {
-          PK: `TEAM#${teamId}`,
-          SK: `LEVEL#${levelId}`,
-        },
-        UpdateExpression:
-          "SET started_at = :startedAt, updated_at = :updatedAt",
-        ExpressionAttributeValues: {
-          ":startedAt": currentTimestamp,
-          ":updatedAt": currentTimestamp,
-        },
-      })
-    );
   }
 
   static async markLevelAsCompleted(

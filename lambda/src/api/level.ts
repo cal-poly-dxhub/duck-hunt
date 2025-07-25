@@ -243,7 +243,7 @@ export const handler = async (
 
     console.log("INFO: All team levels:", allTeamLevels);
 
-    const completedLevels = allTeamLevels.filter(
+    const completedTeamLevels = allTeamLevels.filter(
       (level) => level.completed_at !== null
     );
 
@@ -286,11 +286,6 @@ export const handler = async (
           } as LevelResponseBody),
         };
       }
-
-      await TeamLevelOperations.markLevelAsStarted(
-        headers["team-id"] as UUID,
-        newCurrentLevel.id as UUID
-      );
 
       // otherwise, more levels to go
       const newCurrentUserMessages = await MessageOperations.getForUserAtLevel(
@@ -349,13 +344,13 @@ export const handler = async (
         } as LevelResponseBody),
       };
     } else if (
-      completedLevels.some((level) => level.id === eventBody.levelId)
+      completedTeamLevels.some((level) => level.level_id === eventBody.levelId)
     ) {
       console.warn(
         "WARN: Level ID already completed:",
         eventBody.levelId,
         "Completed levels:",
-        completedLevels.map((level) => level.id)
+        completedTeamLevels.map((level) => level.level_id)
       );
 
       // cant use respondByLevelTime here because /level responds with LevelResponseBody
