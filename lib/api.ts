@@ -63,7 +63,7 @@ export class ApiResources extends Construct {
     });
     props.duckHuntTable.grantReadWriteData(messageLambda);
     const messageLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
-      messageLambda
+      messageLambda,
     );
     messageResource.addMethod("POST", messageLambdaIntegration);
 
@@ -88,7 +88,7 @@ export class ApiResources extends Construct {
     });
     props.duckHuntTable.grantReadWriteData(levelLambda);
     const levelLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
-      levelLambda
+      levelLambda,
     );
     levelResource.addMethod("POST", levelLambdaIntegration);
 
@@ -113,7 +113,7 @@ export class ApiResources extends Construct {
     });
     props.duckHuntTable.grantReadWriteData(clearChatLambda);
     const clearChatLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
-      clearChatLambda
+      clearChatLambda,
     );
     clearChatResource.addMethod("POST", clearChatLambdaIntegration);
 
@@ -138,7 +138,7 @@ export class ApiResources extends Construct {
           retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
           removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
         }),
-      }
+      },
     );
     props.duckHuntTable.grantReadWriteData(pingCoordinatesLambda);
     const pingCoordinatesLambdaIntegration =
@@ -146,29 +146,29 @@ export class ApiResources extends Construct {
     pingCoordinatesResource.addMethod("POST", pingCoordinatesLambdaIntegration);
 
     // /api/upload-photo resource
-    // const uploadPhotoResource = apiResource.addResource("upload-photo");
-    // const uploadPhotoLambda = new NodejsFunction(this, "UploadPhotoLambda", {
-    //   runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
-    //   entry: "lambda/src/api/uploadPhoto.ts",
-    //   handler: "handler",
-    //   bundling: {
-    //     externalModules: ["@aws-sdk/*"],
-    //     nodeModules: [],
-    //   },
-    //   environment: {
-    //     DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
-    //     PHOTO_BUCKET: props.photoBucket.bucketName,
-    //   },
-    //   logGroup: new cdk.aws_logs.LogGroup(this, "UploadPhotoLogGroup", {
-    //     logGroupName: `UploadPhotoLambdaLogGroup-${props.uniqueId}`,
-    //     retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
-    //     removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
-    //   }),
-    // });
-
-    // const uploadPhotoLambdaIntegration =
-    //   new cdk.aws_apigateway.LambdaIntegration(uploadPhotoLambda);
-    // props.photoBucket.grantReadWrite(uploadPhotoLambda);
-    // uploadPhotoResource.addMethod("POST", uploadPhotoLambdaIntegration);
+    const uploadPhotoResource = apiResource.addResource("upload-photo");
+    const uploadPhotoLambda = new cdk.aws_lambda.Function(
+      this,
+      "UploadPhotoLambda",
+      {
+        runtime: cdk.aws_lambda.Runtime.PYTHON_3_12,
+        code: cdk.aws_lambda.Code.fromAsset("lambda/src/api/"),
+        handler: "upload_photo.lambda_handler",
+        environment: {
+          DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
+          PHOTO_BUCKET: props.photoBucket.bucketName,
+        },
+        logGroup: new cdk.aws_logs.LogGroup(this, "UploadPhotoLogGroup", {
+          logGroupName: `UploadPhotoLambdaLogGroup-${props.uniqueId}`,
+          retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
+          removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
+        }),
+      },
+    );
+    props.duckHuntTable.grantReadWriteData(uploadPhotoLambda);
+    props.photoBucket.grantReadWrite(uploadPhotoLambda);
+    const uploadPhotoLambdaIntegration =
+      new cdk.aws_apigateway.LambdaIntegration(uploadPhotoLambda);
+    uploadPhotoResource.addMethod("POST", uploadPhotoLambdaIntegration);
   }
 }
