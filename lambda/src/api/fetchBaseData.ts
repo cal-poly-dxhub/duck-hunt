@@ -12,7 +12,7 @@ import { TeamLevel, TeamLevelOperations } from "src/dynamo/teamLevel";
 import { UserOperations } from "src/dynamo/user";
 
 interface BaseDataResponse {
-  currentTeamLevel: TeamLevel | null;
+  currentTeamLevel: TeamLevel;
   currentLevel: Level;
   gameId: UUID;
   userMessages: Array<Message>;

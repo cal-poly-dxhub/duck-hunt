@@ -78,6 +78,15 @@ export const handler = async (
       };
     }
 
+    if (userMessages[userMessages.length - 1].role === MessageRole.User) {
+      console.warn("WARN: Last message is from user, removing it.");
+      userMessages.pop(); // remove last message if it's from the user
+      console.log(
+        "INFO: Updated user messages after removing last user message:",
+        JSON.stringify(userMessages, null, 2)
+      );
+    }
+
     if (
       new Date(currentTeamLevel.updated_at).getTime() <
       Date.now() - 10 * 60 * 1000

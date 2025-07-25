@@ -131,23 +131,24 @@ export default function Chat() {
   // check for teamId and userId
   useEffect(() => {
     if (gameLoading) return;
-    if (teamIdFromUrl) return;
-
-    if (!userId) {
-      const newUserId = v4();
-      console.warn("No userId found in GameProvider. Generating a new one.");
-      setUserId(newUserId);
-    }
 
     if (teamIdFromUrl) {
       console.warn(
-        "Team ID provided in URL. Setting teamId to the provided value."
+        "WARN: Team ID provided in URL. Setting teamId to the provided value."
       );
       setTeamId(teamIdFromUrl);
     }
 
+    if (!userId) {
+      const newUserId = v4();
+      console.warn(
+        "WARN: No userId found in GameProvider. Generating a new one."
+      );
+      setUserId(newUserId);
+    }
+
     if (!teamId) {
-      console.error("No team id found in GameProvider or url.");
+      console.error("ERROR: No team id found in GameProvider or url.");
 
       const message = {
         id: v4() as UUID,
@@ -166,7 +167,7 @@ export default function Chat() {
   // fetch every page refresh
   useEffect(() => {
     const handleCheckLocation = async () => {
-      const { currentLevel, messageHistory, requiresPhoto } =
+      const { currentTeamLevel, messageHistory, requiresPhoto } =
         await scavengerHuntApi.level(levelIdFromUrl);
 
       if (requiresPhoto) {
@@ -176,7 +177,7 @@ export default function Chat() {
 
       const systemMessage = {
         id: v4() as UUID,
-        content: `You are at level: ${currentLevel}.`,
+        content: `You are at team level: ${currentTeamLevel}.`,
         role: MessageRole.Assistant,
         createdAt: new Date(),
       };

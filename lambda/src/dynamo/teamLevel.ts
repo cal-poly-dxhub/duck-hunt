@@ -80,4 +80,65 @@ export class TeamLevelOperations {
     // return the first level (current level)
     return sortedLevels[0] as TeamLevel;
   }
+
+  static async getAllForTeam(teamId: string): Promise<TeamLevel[]> {
+    const teamLevels = await docClient.send(
+      new QueryCommand({
+        TableName: DUCK_HUNT_TABLE_NAME,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+        ExpressionAttributeValues: {
+          ":pk": `TEAM#${teamId}`,
+          ":sk": "LEVEL#",
+        },
+      })
+    );
+
+    if (!teamLevels.Items || teamLevels.Items.length === 0) {
+      return [];
+    }
+
+    return teamLevels.Items as TeamLevel[];
+  }
+
+  static async markLevelAsCompleted(
+    teamId: string,
+    levelId: string
+  ): Promise<void> {
+    const currentTimestamp = getCurrentTimestamp();
+
+    await docClient.send(
+      new PutCommand({
+        TableName: DUCK_HUNT_TABLE_NAME,
+        Item: {
+          PK: `TEAM#${teamId}`,
+          SK: `LEVEL#${levelId}`,
+          GSI1PK: `LEVEL#${levelId}`,
+          GSI1SK: `TEAM#${teamId}`,
+          ItemType: "TEAM_LEVEL",
+          completed_at: currentTimestamp,
+          updated_at: currentTimestamp,
+        },
+      })
+    );
+  }
+
+  static async getNextLevel(
+    teamId: string,
+    currentLevelId: string
+  ): Promise<TeamLevel | null> {
+    const teamLevels = await this.getAllForTeam(teamId);
+    const sortedTeamLevels = teamLevels.sort((a, b) => a.index - b.index);
+
+    // find the current level index
+    const currentLevelIndex = sortedTeamLevels.findIndex(
+      (level) => level.level_id === currentLevelId
+    );
+
+    // if current level is the last one, return null
+    if (currentLevelIndex === sortedTeamLevels.length - 1) {
+      return null;
+    }
+
+    return sortedTeamLevels[currentLevelIndex + 1];
+  }
 }

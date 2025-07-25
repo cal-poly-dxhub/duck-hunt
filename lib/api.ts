@@ -52,6 +52,7 @@ export class ApiResources extends Construct {
         externalModules: ["@aws-sdk/*"],
         nodeModules: [],
       },
+      timeout: cdk.Duration.seconds(30),
       environment: {
         DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
       },
@@ -83,6 +84,7 @@ export class ApiResources extends Construct {
         externalModules: ["@aws-sdk/*"],
         nodeModules: [],
       },
+      timeout: cdk.Duration.seconds(30),
       environment: {
         DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
       },
@@ -114,6 +116,7 @@ export class ApiResources extends Construct {
         externalModules: ["@aws-sdk/*"],
         nodeModules: [],
       },
+      timeout: cdk.Duration.seconds(30),
       environment: {
         DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
       },
@@ -179,6 +182,7 @@ export class ApiResources extends Construct {
     //     externalModules: ["@aws-sdk/*"],
     //     nodeModules: [],
     //   },
+    //   timeout: cdk.Duration.seconds(30),
     //   environment: {
     //     DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
     //     PHOTO_BUCKET: props.photoBucket.bucketName,

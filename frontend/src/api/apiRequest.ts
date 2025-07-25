@@ -26,7 +26,7 @@ export async function apiRequest<T = unknown>(
 
     // TODO: teamId and userId validataion
 
-    if (!validateUUID(userId)) {
+    if (userId !== undefined && !validateUUID(userId)) {
       console.error("User ID not valid");
       throw new Error("User ID not valid. Try clearing your browser cookies.");
     } else if (!validateUUID(teamId)) {

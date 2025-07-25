@@ -71,11 +71,13 @@ const invokeBedrock = async ({
   levelId,
   messageHistory,
 }: InvokeBedrockProps): Promise<InvokeBedrockResponse> => {
+  console.log(
+    `INFO: Invoking Bedrock for level ${levelId} with ${messageHistory.length} message(s)`
+  );
   const nextMessageId = v4() as UUID;
 
   try {
     const levelData = await LevelOperations.getByLevelId(levelId);
-
     if (!levelData) {
       // TODO: Return a clue from dynamo if level not found
       throw new Error(`Level not found for ID: ${levelId}`);
@@ -97,6 +99,10 @@ const invokeBedrock = async ({
       temperature: 0.7,
     };
 
+    console.log(
+      `INFO: Sending request to Bedrock with system prompt and ${messages.length} message(s)`
+    );
+
     const command = new InvokeModelCommand({
       modelId: MODEL_ID,
       body: JSON.stringify(requestBody),
@@ -111,6 +117,8 @@ const invokeBedrock = async ({
     }
 
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+
+    console.log(`INFO: Received response from Bedrock:`, responseBody);
 
     if (
       !responseBody.content ||

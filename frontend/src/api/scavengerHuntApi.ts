@@ -58,21 +58,29 @@ const message = async (
 // /level
 const level = async (levelId: string | null): Promise<LevelResponseBody> => {
   try {
-    console.log("INFO: Fetching level data with levelId:", levelId);
-    if (levelId !== undefined && !validateUUID(levelId)) {
+    if (!!levelId && !validateUUID(levelId)) {
       console.error("Level ID not valid");
       throw new Error(
         "Level ID not valid. Try scanning another duck at this location."
       );
     }
 
-    const { data, success, error } = await apiRequest<LevelResponseBody>(
-      "POST",
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/level`,
-      {
-        body: { levelId },
-      }
-    );
+    const { data, status, success, error } =
+      await apiRequest<LevelResponseBody>(
+        "POST",
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/level`,
+        {
+          body: { levelId },
+        }
+      );
+
+    if (status == 208 && data) {
+      // level already completed
+      return data;
+    } else if (status == 202 && data) {
+      // all levels completed
+      return data;
+    }
 
     if (!success) {
       console.error("/level returned not success:", JSON.stringify(error));
@@ -83,7 +91,7 @@ const level = async (levelId: string | null): Promise<LevelResponseBody> => {
   } catch (error) {
     console.error("Error in atLevel function:", error);
     return {
-      currentLevel: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      currentTeamLevel: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
       messageHistory: [
         {
           id: v4() as UUID,

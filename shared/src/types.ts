@@ -56,7 +56,7 @@ export interface LevelRequestBody {
 
 // response body schema for /level
 export interface LevelResponseBody {
-  currentLevel: string;
+  currentTeamLevel: string;
   messageHistory: Array<Message>;
   requiresPhoto: boolean;
 }
