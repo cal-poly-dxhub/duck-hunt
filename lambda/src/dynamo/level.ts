@@ -1,16 +1,10 @@
-import {
-  GetCommand,
-  PutCommand,
-  UpdateCommand,
-  DeleteCommand,
-  QueryCommand,
-} from "@aws-sdk/lib-dynamodb";
+import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
 import {
   BaseEntity,
   docClient,
-  getCurrentTimestamp,
   DUCK_HUNT_TABLE_NAME,
+  getCurrentTimestamp,
 } from ".";
 
 export interface Character {
@@ -66,23 +60,6 @@ export class LevelOperations {
     return level;
   }
 
-  static async getById(gameId: string, levelId: string): Promise<Level | null> {
-    const result = await docClient.send(
-      new GetCommand({
-        TableName: DUCK_HUNT_TABLE_NAME,
-        Key: {
-          PK: `GAME#${gameId}`,
-          SK: `LEVEL#${levelId}`,
-        },
-      })
-    );
-
-    if (!result.Item) return null;
-
-    const { PK, SK, GSI1PK, GSI1SK, ItemType, ...level } = result.Item;
-    return level as Level;
-  }
-
   // New method to get level by ID alone using GSI1
   static async getByLevelId(levelId: string): Promise<Level | null> {
     const result = await docClient.send(
@@ -91,7 +68,7 @@ export class LevelOperations {
         IndexName: "GSI1",
         KeyConditionExpression: "GSI1PK = :gsi1pk",
         ExpressionAttributeValues: {
-          ":gsi1pk": `LEVEL#\${levelId}`,
+          ":gsi1pk": `LEVEL#${levelId}`,
         },
         Limit: 1,
       })
@@ -101,72 +78,5 @@ export class LevelOperations {
 
     const { PK, SK, GSI1PK, GSI1SK, ItemType, ...level } = result.Items[0];
     return level as Level;
-  }
-
-  static async getByGameId(gameId: string): Promise<Level[]> {
-    const result = await docClient.send(
-      new QueryCommand({
-        TableName: DUCK_HUNT_TABLE_NAME,
-        KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
-        ExpressionAttributeValues: {
-          ":pk": `GAME#${gameId}`,
-          ":sk": "LEVEL#",
-        },
-      })
-    );
-
-    return (
-      result.Items?.map((item) => {
-        const { PK, SK, GSI1PK, GSI1SK, ItemType, ...level } = item;
-        return level as Level;
-      }) || []
-    );
-  }
-
-  static async update(
-    gameId: string,
-    levelId: string,
-    updates: Partial<Omit<Level, "id" | "created_at" | "game_id">>
-  ): Promise<Level> {
-    const updateExpression = [];
-    const expressionAttributeNames: Record<string, string> = {};
-    const expressionAttributeValues: Record<string, any> = {};
-
-    updates.updated_at = getCurrentTimestamp();
-
-    for (const [key, value] of Object.entries(updates)) {
-      updateExpression.push(`#${key} = :${key}`);
-      expressionAttributeNames[`#${key}`] = key;
-      expressionAttributeValues[`:${key}`] = value;
-    }
-
-    const result = await docClient.send(
-      new UpdateCommand({
-        TableName: DUCK_HUNT_TABLE_NAME,
-        Key: {
-          PK: `GAME#${gameId}`,
-          SK: `LEVEL#${levelId}`,
-        },
-        UpdateExpression: `SET ${updateExpression.join(", ")}`,
-        ExpressionAttributeNames: expressionAttributeNames,
-        ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: "ALL_NEW",
-      })
-    );
-
-    const { PK, SK, GSI1PK, GSI1SK, ItemType, ...level } = result.Attributes!;
-    return level as Level;
-  }
-
-  static async delete(gameId: string, levelId: string): Promise<void> {
-    await docClient.send(
-      new DeleteCommand({
-        TableName: DUCK_HUNT_TABLE_NAME,
-        Key: {
-          PK: `GAME#${gameId}`,
-          SK: `LEVEL#${levelId}`,
-        },
-      })
-    );
   }
 }

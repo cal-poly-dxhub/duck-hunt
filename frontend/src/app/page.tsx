@@ -14,7 +14,7 @@ import {
   TextInput,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
-import { Message, MessageRole } from "@shared/types";
+import { Message, MessageRole, UUID } from "@shared/types";
 import { IconSend, IconTrash, IconUpload } from "@tabler/icons-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -40,10 +40,9 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   // TODO:
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [typingMessages, setTypingMessages] = useState<Record<number, string>>(
+  const [typingMessages, setTypingMessages] = useState<Record<string, string>>(
     {}
   );
-
   const [needsTeamPhoto, setNeedsTeamPhoto] = useState<boolean>(false);
 
   const {
@@ -53,6 +52,13 @@ export default function Chat() {
     setTeamId,
     isLoading: gameLoading,
   } = useGame();
+
+  const loadingMessage: Message<MessageRole.Assistant> = {
+    id: v4() as UUID,
+    content: "Loading...",
+    role: MessageRole.Assistant,
+    createdAt: new Date(),
+  };
 
   const typeMessage = async (message: Message) => {
     for (let i = 0; i <= message.content.length; i++) {
@@ -64,6 +70,7 @@ export default function Chat() {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
     }
+
     setTypingMessages((prev) => {
       const newState = { ...prev };
       delete newState[message.id];
@@ -78,16 +85,9 @@ export default function Chat() {
     setInput("");
 
     const newUserMessage: Message<MessageRole.User> = {
-      id: messages.length + 1,
+      id: v4() as UUID,
       content: userMessage,
       role: MessageRole.User,
-      createdAt: new Date(),
-    };
-
-    const loadingMessage: Message<MessageRole.Assistant> = {
-      id: messages.length + 2,
-      content: "Loading",
-      role: MessageRole.Assistant,
       createdAt: new Date(),
     };
 
@@ -100,7 +100,7 @@ export default function Chat() {
     }
 
     const systemMessage: Message = {
-      id: messages.length + 2,
+      id: v4() as UUID,
       content: message.content,
       role: MessageRole.Assistant,
       createdAt: new Date(),
@@ -119,9 +119,21 @@ export default function Chat() {
   };
 
   const handleClearChat = async () => {
+    setLoading(true);
+    setInput("");
+    setMessages([
+      {
+        id: v4() as UUID,
+        content: "Loading...",
+        role: MessageRole.Assistant,
+        createdAt: new Date(),
+      },
+    ]);
+
     const { message } = await scavengerHuntApi.clearChat();
+
     setMessages([message]);
-    setTypingMessages({});
+    setLoading(false);
   };
 
   const searchParams = useSearchParams();
@@ -129,49 +141,32 @@ export default function Chat() {
   const levelIdFromUrl = searchParams.get("level-id");
   const endSequenceFromUrl = searchParams.get("end-sequence");
 
-  // team id
+  // check for teamId and userId
   useEffect(() => {
-    if (gameLoading) {
-      return;
+    if (gameLoading) return;
+
+    if (teamIdFromUrl) {
+      console.warn(
+        "WARN: Team ID provided in URL. Setting teamId to the provided value."
+      );
+      setTeamId(teamIdFromUrl);
     }
 
     if (!userId) {
       const newUserId = v4();
-      console.warn("No userId found in GameProvider. Generating a new one.");
+      console.warn(
+        "WARN: No userId found in GameProvider. Generating a new one."
+      );
       setUserId(newUserId);
     }
 
-    if (teamIdFromUrl) {
-      console.warn(
-        "Team ID provided in URL. Setting teamId to the provided value."
-      );
-      setTeamId(teamIdFromUrl);
-
-      const message = {
-        id: 1,
-        content: `Added to team: ${teamIdFromUrl}`,
-        role: MessageRole.Assistant,
-        createdAt: new Date(),
-      };
-
-      setMessages([message]);
-      typeMessage(message);
-    }
-  }, [teamIdFromUrl, teamId, setTeamId, gameLoading, userId, setUserId]);
-
-  // check if ids present
-  useEffect(() => {
-    if (gameLoading) return;
-    if (teamIdFromUrl) return;
-
     if (!teamId) {
-      console.error(
-        "No teamId found in GameProvider. Please ensure you have set a team ID."
-      );
+      console.error("ERROR: No team id found in GameProvider or url.");
 
       const message = {
-        id: 1,
-        content: "Error: No team ID provided in URL or GameProvider.",
+        id: v4() as UUID,
+        content:
+          "No team id found. Try scanning your team duck again or contact support.",
         role: MessageRole.Assistant,
         createdAt: new Date(),
       };
@@ -179,21 +174,42 @@ export default function Chat() {
       setMessages([message]);
       typeMessage(message);
     }
-  }, [teamId, teamIdFromUrl, gameLoading]);
+  }, [teamId, teamIdFromUrl, gameLoading, userId, setUserId, setTeamId]);
 
   // /level
+  // fetch every page refresh
   useEffect(() => {
     const handleCheckLocation = async () => {
-      const data = await scavengerHuntApi.level(levelIdFromUrl);
+      setMessages([loadingMessage]);
+      const { mapLink, currentTeamLevel, messageHistory, requiresPhoto } =
+        await scavengerHuntApi.level(levelIdFromUrl);
+
+      console.log("INFO: Fetched level data:", {
+        currentTeamLevel,
+        messageHistory,
+        mapLink,
+        requiresPhoto,
+      });
+
+      if (requiresPhoto) {
+        setNeedsTeamPhoto(true);
+        return;
+      }
+
+      if (mapLink !== null) {
+        // if map link is not null, open it in a new tab
+        console.log("INFO: Opening map link:", mapLink);
+        window.open(mapLink, "_blank");
+      }
 
       const systemMessage = {
-        id: messages.length + 1,
-        content: `You are at level: ${data.currentLevel}.`,
+        id: v4() as UUID,
+        content: `You are at team level: ${currentTeamLevel}.`,
         role: MessageRole.Assistant,
         createdAt: new Date(),
       };
 
-      setMessages([systemMessage, data.message]);
+      setMessages(messageHistory);
       typeMessage(systemMessage);
       setLoading(false);
     };
@@ -201,7 +217,6 @@ export default function Chat() {
     if (teamId && userId) {
       handleCheckLocation();
     }
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, teamId, levelIdFromUrl, endSequenceFromUrl]);
 
@@ -226,6 +241,8 @@ export default function Chat() {
     >
       {/* Team Photo Upload Modal */}
       <Modal
+        closeOnClickOutside={false}
+        closeButtonProps={{ style: { display: "none" } }}
         opened={needsTeamPhoto}
         onClose={() => setNeedsTeamPhoto(false)}
         title="Team Photo Required"

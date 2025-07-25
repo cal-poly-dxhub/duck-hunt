@@ -1,7 +1,13 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { validateUUID } from "@shared/scripts";
-import { corsHeaders, RequestHeaders, ResponseError } from "@shared/types";
+import {
+  corsHeaders,
+  RequestHeaders,
+  ResponseError,
+  UUID,
+} from "@shared/types";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import { CoordinateSnapshotOperations } from "src/dynamo/coordinates";
+import { fetchBaseData } from "./fetchBaseData";
 
 const dynamoClient = new DynamoDBClient({});
 
@@ -18,44 +24,30 @@ export const handler = async (
 
   // validate request headers
   const headers = event.headers as unknown as RequestHeaders;
+  const eventBody = JSON.parse(event.body || "{}");
 
-  // validate headers["user-id"] and headers["team-id"]
-  if (!validateUUID(headers["user-id"])) {
-    console.error(
-      "ERROR: Invalid user ID in request headers:",
-      headers["user-id"]
-    );
+  if (!eventBody.latitude || !eventBody.longitude) {
+    console.error("ERROR: Missing latitude or longitude in request body");
     return {
       statusCode: 400,
       headers: corsHeaders,
       body: JSON.stringify({
-        error: "Invalid user-id header.",
-        displayMessage: "The provided user ID is invalid. Contact support.",
-        details: `Invalid user ID: ${headers["user-id"]}`,
-      } as ResponseError),
-    };
-  } else if (!validateUUID(headers["team-id"])) {
-    console.error(
-      "ERROR: Invalid team ID in request headers:",
-      headers["team-id"]
-    );
-    return {
-      statusCode: 400,
-      headers: corsHeaders,
-      body: JSON.stringify({
-        error: "Invalid team-id header.",
-        displayMessage:
-          "The provided team ID is invalid. Try scanning your team duck.",
-        details: `Invalid team ID: ${headers["team-id"]}`,
+        error: "Invalid request",
+        displayMessage: "Latitude and longitude are required.",
+        details: "Latitude and longitude must be provided in the request body.",
       } as ResponseError),
     };
   }
 
   try {
-    // query dynamo for user
-    // query dynamo for team
+    await fetchBaseData(headers);
 
-    // insert coordinates into dynamoDB
+    CoordinateSnapshotOperations.create({
+      user_id: headers["user-id"] as UUID,
+      team_id: headers["team-id"] as UUID,
+      latitude: eventBody.latitude,
+      longitude: eventBody.longitude,
+    });
 
     return {
       statusCode: 200,

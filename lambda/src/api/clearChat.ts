@@ -1,17 +1,16 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { S3Client } from "@aws-sdk/client-s3";
-import { validateUUID } from "@shared/scripts";
 import {
   corsHeaders,
   MessageResponseBody,
+  MessageRole,
   RequestHeaders,
   ResponseError,
+  UUID,
 } from "@shared/types";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import { invokeBedrock, InvokeBedrockProps } from "../invokeBedrock";
-
-const s3Client = new S3Client({});
-const dynamoClient = new DynamoDBClient({});
+import { MessageOperations } from "src/dynamo/message";
+import { respondByLevelTime } from "src/respondByLevelTime";
+import { v4 } from "uuid";
+import { fetchBaseData } from "./fetchBaseData";
 
 /**
  * /clear-chat lambda handler
@@ -27,80 +26,79 @@ export const handler = async (
 
   // validate request headers
   const headers = event.headers as unknown as RequestHeaders;
-
-  // validate headers["user-id"] and headers["team-id"]
-  if (!validateUUID(headers["user-id"])) {
-    console.error(
-      "ERROR: Invalid user ID in request headers:",
-      headers["user-id"]
-    );
-    return {
-      statusCode: 400,
-      headers: corsHeaders,
-      body: JSON.stringify({
-        error: "Invalid user-id header.",
-        displayMessage: "The provided user ID is invalid. Contact support.",
-        details: `Invalid user ID: ${headers["user-id"]}`,
-      } as ResponseError),
-    };
-  } else if (!validateUUID(headers["team-id"])) {
-    console.error(
-      "ERROR: Invalid team ID in request headers:",
-      headers["team-id"]
-    );
-    return {
-      statusCode: 400,
-      headers: corsHeaders,
-      body: JSON.stringify({
-        error: "Invalid team-id header.",
-        displayMessage:
-          "The provided team ID is invalid. Try scanning your team duck.",
-        details: `Invalid team ID: ${headers["team-id"]}`,
-      } as ResponseError),
-    };
-  }
-
   try {
-    // query dynamo for user
-    // query dynamo for team
-    // query dynamo for team's current level
+    const { currentLevel, gameId, currentTeamLevel, userMessages } =
+      await fetchBaseData(headers);
 
-    // check how long since they started the level
-    // if >10 min, return easy hint
-    // if >15 min, return maps link
-
-    // query dynamo for user's messages at this level
-
-    // if latest message is from user, remove from message history
-    // if messages do not alternate roles, fix
-
-    // soft delete all messages for the user at the current level
-    // fetch and return the hardcoded initial message for the level
-
-    const invokeBedrockProps: InvokeBedrockProps = {
-      levelId: "00000000-0000-0000-0000-000000000000", // get from dynamo
-      messageHistory: [],
-    };
-    const { bedrockResponseMessage, bedrockFailed } = await invokeBedrock(
-      invokeBedrockProps
+    console.log(
+      "INFO: Fetched base data:",
+      JSON.stringify({ currentTeamLevel, userMessages }, null, 2)
     );
 
-    if (bedrockFailed) {
-      console.error("Bedrock failed");
-      // TODO: handle bedrock failed?
+    if (!currentTeamLevel) {
+      console.error("ERROR: No current team level found for team.");
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          error: "No current team level found.",
+          displayMessage:
+            "You have completed all levels. Contact support for assistance.",
+          details: "No current team level found for the team.",
+        } as ResponseError),
+      };
     }
 
-    // stub response
-    const responseBody: MessageResponseBody = {
-      message: bedrockResponseMessage,
-      mapLink: null,
-    };
+    if (!currentLevel) {
+      console.error("ERROR: No current level found for team.");
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          error: "No current level found.",
+          displayMessage:
+            "You have completed all levels. Contact support for assistance.",
+          details: "No current level found for the team.",
+        } as ResponseError),
+      };
+    }
 
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify(responseBody),
-    };
+    if (currentTeamLevel.completed_at) {
+      const messageResponse: MessageResponseBody = {
+        message: {
+          id: v4() as UUID,
+          role: MessageRole.Assistant,
+          content: "Congratulations! You have completed the Duck Hunt!",
+          createdAt: new Date(),
+        },
+        mapLink: null,
+      };
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify(messageResponse),
+      };
+    }
+
+    console.log(
+      "INFO: Soft deleting current level messages for user:",
+      headers["user-id"]
+    );
+
+    await MessageOperations.softDeleteCurrentLevelMessages(
+      headers["user-id"] as UUID,
+      currentLevel.id as UUID
+    );
+
+    // respond based on the time spent on the level
+    // can use this as /clearChat responds with MessageResponseBody
+    return respondByLevelTime({
+      gameId,
+      userId: headers["user-id"] as UUID,
+      teamId: headers["team-id"] as UUID,
+      currentLevel,
+    });
   } catch (error) {
     console.error("ERROR: Failed to process request:", error);
     return {

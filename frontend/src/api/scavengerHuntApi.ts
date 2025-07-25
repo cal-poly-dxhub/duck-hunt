@@ -4,7 +4,10 @@ import {
   Message,
   MessageResponseBody,
   MessageRole,
+  ResponseError,
+  UUID,
 } from "@shared/types";
+import { v4 } from "uuid";
 import { apiRequest } from "./apiRequest";
 
 // /message
@@ -19,7 +22,11 @@ const message = async (
       !userMessage.createdAt
     ) {
       console.error("Invalid user message:", JSON.stringify(userMessage));
-      throw new Error("Invalid user message. Please try again.");
+      throw {
+        error: "Invalid user message",
+        displayMessage: "Failed to send message. Please try again.",
+        details: "User message is missing required fields.",
+      };
     }
 
     const { data, success, error } = await apiRequest<MessageResponseBody>(
@@ -32,7 +39,7 @@ const message = async (
 
     if (!success) {
       console.error("/message returned not success:", JSON.stringify(error));
-      throw new Error(error.displayMessage);
+      throw error;
     }
 
     return data;
@@ -40,11 +47,11 @@ const message = async (
     console.error("Error in message function:", error);
     return {
       message: {
-        id: userMessage.id + 1,
+        id: v4() as UUID,
         role: MessageRole.Assistant,
         content:
-          typeof (error as { message?: string })?.message === "string"
-            ? (error as { message: string }).message
+          "displayMessage" in (error as object)
+            ? (error as ResponseError).displayMessage
             : "Failed to send message. Please try again or contact support.",
         createdAt: new Date(),
       },
@@ -56,46 +63,60 @@ const message = async (
 // /level
 const level = async (levelId: string | null): Promise<LevelResponseBody> => {
   try {
-    if (levelId !== undefined && !validateUUID(levelId)) {
+    if (!!levelId && !validateUUID(levelId)) {
       console.error("Level ID not valid");
-      throw new Error(
-        "Level ID not valid. Try scanning another duck at this location."
-      );
+      throw {
+        error: "Invalid level ID",
+        displayMessage: "Failed to retrieve level data. Please try again.",
+        details: "Level ID is not a valid UUID.",
+      };
     }
 
-    const { data, success, error } = await apiRequest<LevelResponseBody>(
-      "POST",
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/level`,
-      {
-        body: { levelId },
-      }
-    );
+    const { data, status, success, error } =
+      await apiRequest<LevelResponseBody>(
+        "POST",
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/level`,
+        {
+          body: { levelId },
+        }
+      );
+
+    if (status == 208 && data) {
+      // level already completed
+      return data;
+    } else if (status == 202 && data) {
+      // all levels completed
+      return data;
+    }
 
     if (!success) {
       console.error("/level returned not success:", JSON.stringify(error));
-      throw new Error(error.displayMessage);
+      throw error;
     }
 
     return data;
   } catch (error) {
     console.error("Error in atLevel function:", error);
     return {
-      currentLevel: "00000000-0000-0000-0000-000000000000",
-      message: {
-        id: 2,
-        content:
-          typeof (error as { message?: string })?.message === "string"
-            ? (error as { message: string }).message
-            : "Failed to retrieve level data. Please try later or contact support.",
-        role: MessageRole.Assistant,
-        createdAt: new Date(),
-      },
-
+      currentTeamLevel: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      messageHistory: [
+        {
+          id: v4() as UUID,
+          content:
+            "displayMessage" in (error as object)
+              ? (error as ResponseError).displayMessage
+              : "Failed to retrieve level data. Please try later or contact support.",
+          role: MessageRole.Assistant,
+          createdAt: new Date(),
+        },
+      ],
       requiresPhoto: false,
+      mapLink: null,
     };
   }
 };
 
+// /clear-chat
 const clearChat = async (): Promise<MessageResponseBody> => {
   try {
     const { data, success, error } = await apiRequest<MessageResponseBody>(
@@ -105,7 +126,7 @@ const clearChat = async (): Promise<MessageResponseBody> => {
 
     if (!success) {
       console.error("/clear-chat returned not success:", JSON.stringify(error));
-      throw new Error(error.displayMessage);
+      throw error;
     }
 
     return data;
@@ -113,11 +134,11 @@ const clearChat = async (): Promise<MessageResponseBody> => {
     console.error("Error in clearChat function:", error);
     return {
       message: {
-        id: 1,
+        id: v4() as UUID,
         role: MessageRole.Assistant,
         content:
-          typeof (error as { message?: string })?.message === "string"
-            ? (error as { message: string }).message
+          "displayMessage" in (error as object)
+            ? (error as ResponseError).displayMessage
             : "Failed to clear chat. Please try again or contact support.",
         createdAt: new Date(),
       },
@@ -207,7 +228,13 @@ const uploadTeamPhoto = async (file: File) => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || "Failed to upload photo");
+      throw {
+        error: data.error || "Error uploading photo",
+        displayMessage:
+          data.displayMessage ||
+          "Failed to upload photo. Please try again or contact support.",
+        details: data.details || "An error occurred while uploading the photo.",
+      } as ResponseError;
     }
 
     return {
@@ -219,8 +246,8 @@ const uploadTeamPhoto = async (file: File) => {
     return {
       success: false,
       error:
-        typeof (error as { message?: string })?.message === "string"
-          ? (error as { message: string }).message
+        "displayMessage" in (error as object)
+          ? (error as ResponseError).displayMessage
           : "Error uploading photo. Try refreshing the page or contact support.",
     };
   }

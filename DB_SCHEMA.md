@@ -72,7 +72,7 @@ _Note: `ts` represents an epoch timestamp for chronological sorting._
 - **`clues` (List of Strings):** Array of main clues (minimum 3 elements)
 - **`easyClues` (List of Strings):** Array of easier clues (minimum 2 elements)
 - **`mapLink` (String):** Google Maps link to the location
-- **`max_tokens` (Number):** Maximum tokens for AI responses (default: 512)
+- **`max_tokens` (Number):** Maximum tokens for AI responses (default: 128)
 
 ---
 
@@ -118,7 +118,7 @@ _Note: `ts` represents an epoch timestamp for chronological sorting._
   ],
   "easyClues": ["Near the main street", "Close to shops"],
   "mapLink": "https://maps.google.com/?q=40.7128,-74.0060",
-  "max_tokens": 512,
+  "max_tokens": 128,
   "created_at": "2024-01-15T10:30:00Z",
   "updated_at": "2024-01-15T10:30:00Z"
 }
@@ -139,22 +139,3 @@ _Note: `ts` represents an epoch timestamp for chronological sorting._
   "updated_at": "2024-01-15T10:00:00Z"
 }
 ```
-
----
-
-## Key Changes Made:
-
-1. **Added `levelsInGame` to GAME entity** - to track how many levels each team should play
-2. **Expanded LEVEL entity attributes** - added all the game config fields:
-   - `levelName` for the level identifier
-   - `character` as a Map containing `name` and `systemPrompt`
-   - `location` as a Map containing `description`, `latitude`, and `longitude`
-   - `clues` and `easyClues` as Lists of Strings
-   - `mapLink` for the Google Maps URL
-   - `max_tokens` for AI response limits
-3. **Updated the Key Attributes column** to reflect the new fields
-4. **Added detailed attribute schemas section** to clearly define the structure of complex attributes
-5. **Added data storage examples** to show how the nested objects would be stored in DynamoDB
-6. **Added GSI1 access pattern for LEVEL entity** - enables querying levels by just the `level_id` using `QUERY_GSI1(GSI1PK=LEVEL#{level_id})`, which is essential for the Bedrock integration where lambda functions need to retrieve level data (character, location, clues) using only the levelId parameter.
-
-The access patterns leverage the existing GSI1 structure where `GSI1PK = LEVEL#{level_id}` for efficient level lookups. The DynamoDB Map and List data types handle the nested objects (`character` and `location`) efficiently.

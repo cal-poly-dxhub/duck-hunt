@@ -28,8 +28,8 @@ export class DatastoreResources extends Construct {
           type: dynamodb.AttributeType.STRING,
         },
         removalPolicy: props.removalPolicy ?? cdk.RemovalPolicy.DESTROY,
-        timeToLiveAttribute: "deleted_at", // enable soft delete
         tableName: `ScavengerHuntData-${props.uniqueId}`,
+        timeToLiveAttribute: "ttl", // not used, but deleted_at is not longer ttl
       }
     );
 

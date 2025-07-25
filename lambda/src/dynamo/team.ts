@@ -1,17 +1,17 @@
 import {
-  BaseEntity,
-  docClient,
-  getCurrentTimestamp,
-  DUCK_HUNT_TABLE_NAME,
-} from ".";
-import {
+  DeleteCommand,
   GetCommand,
   PutCommand,
   QueryCommand,
   UpdateCommand,
-  DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
+import {
+  BaseEntity,
+  docClient,
+  DUCK_HUNT_TABLE_NAME,
+  getCurrentTimestamp,
+} from ".";
 
 export interface Team extends BaseEntity {
   name: string;

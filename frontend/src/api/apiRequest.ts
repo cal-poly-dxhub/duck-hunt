@@ -26,7 +26,7 @@ export async function apiRequest<T = unknown>(
 
     // TODO: teamId and userId validataion
 
-    if (!validateUUID(userId)) {
+    if (userId !== undefined && !validateUUID(userId)) {
       console.error("User ID not valid");
       throw new Error("User ID not valid. Try clearing your browser cookies.");
     } else if (!validateUUID(teamId)) {
@@ -86,18 +86,13 @@ export async function apiRequest<T = unknown>(
     // console.log("INFO: API Response:", response);
 
     if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage: string;
-
+      let errorMessage = null;
+      let errorDetails = null;
       try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage =
-          errorJson.message ||
-          errorJson.error ||
-          `HTTP ${response.status}: ${response.statusText}`;
+        errorDetails = await response.clone().json();
       } catch {
-        errorMessage =
-          errorText || `HTTP ${response.status}: ${response.statusText}`;
+        const errorText = await response.text();
+        errorMessage = errorText || "An unknown error occurred";
       }
 
       return {
@@ -105,8 +100,10 @@ export async function apiRequest<T = unknown>(
         success: false,
         status: response.status,
         error: {
-          error: errorMessage,
+          error:
+            errorDetails?.error || errorMessage || "An unknown error occurred",
           displayMessage:
+            errorDetails?.displayMessage ||
             "The server did not respond properly. Try again or contact support.",
           details: "Server response was not OK: " + errorMessage,
         },

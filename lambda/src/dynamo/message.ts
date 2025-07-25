@@ -1,19 +1,12 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-  DynamoDBDocumentClient,
-  GetCommand,
-  PutCommand,
-  QueryCommand,
-  UpdateCommand,
-  DeleteCommand,
-} from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { Message as SharedMessage } from "@shared/types";
 import { v4 as uuidv4 } from "uuid";
 import {
   BaseEntity,
   docClient,
+  DUCK_HUNT_TABLE_NAME,
   getCurrentTimestamp,
   getEpochTimestamp,
-  DUCK_HUNT_TABLE_NAME,
 } from ".";
 
 export interface Message extends BaseEntity {
@@ -22,7 +15,7 @@ export interface Message extends BaseEntity {
   game_id: string;
   level_id: string;
   role: string;
-  text: string;
+  content: string;
 }
 
 // MESSAGE Operations
@@ -63,144 +56,143 @@ export class MessageOperations {
     return message;
   }
 
-  static async getByUserId(userId: string, limit?: number): Promise<Message[]> {
+  static async softDeleteCurrentLevelMessages(
+    userId: string,
+    levelId: string
+  ): Promise<void> {
+    const timestamp = getEpochTimestamp();
+    const sortKeyPrefix = `MESSAGE#`;
+
     const result = await docClient.send(
       new QueryCommand({
         TableName: DUCK_HUNT_TABLE_NAME,
-        KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+        IndexName: "GSI3",
+        KeyConditionExpression: "GSI3PK = :gsi3pk AND begins_with(GSI3SK, :sk)",
         ExpressionAttributeValues: {
-          ":pk": `USER#${userId}`,
-          ":sk": "MESSAGE#",
+          ":gsi3pk": `LEVEL#${levelId}`,
+          ":sk": sortKeyPrefix,
         },
-        ScanIndexForward: false, // Most recent first
-        Limit: limit,
       })
     );
 
+    if (!result.Items || result.Items.length === 0) {
+      console.warn(
+        `No messages found for user ${userId} at level ${levelId} to soft delete.`
+      );
+      return;
+    }
+
+    const { UpdateCommand } = await import("@aws-sdk/lib-dynamodb");
+    const updatePromises = result.Items.map((item) => {
+      return docClient.send(
+        new UpdateCommand({
+          TableName: DUCK_HUNT_TABLE_NAME,
+          Key: {
+            PK: item.PK,
+            SK: item.SK,
+          },
+          UpdateExpression: "SET deleted_at = :deletedAt",
+          ExpressionAttributeValues: {
+            ":deletedAt": timestamp,
+          },
+        })
+      );
+    });
+
+    await Promise.all(updatePromises);
+  }
+
+  static async delete(userId: string, messageId: string): Promise<void> {
+    const timestamp = getEpochTimestamp();
+    const sortKey = `MESSAGE#${timestamp}#${messageId}`;
+
+    await docClient.send(
+      new DeleteCommand({
+        TableName: DUCK_HUNT_TABLE_NAME,
+        Key: {
+          PK: `USER#${userId}`,
+          SK: sortKey,
+        },
+      })
+    );
+  }
+
+  static async getForUserAtLevel(
+    userId: string,
+    levelId: string
+  ): Promise<SharedMessage[]> {
+    const sortKeyPrefix = "MESSAGE#";
+    const result = await docClient.send(
+      new QueryCommand({
+        TableName: DUCK_HUNT_TABLE_NAME,
+        IndexName: "GSI3",
+        KeyConditionExpression: "GSI3PK = :gsi3pk AND begins_with(GSI3SK, :sk)",
+        FilterExpression: "PK = :pk AND attribute_not_exists(deleted_at)",
+        ExpressionAttributeValues: {
+          ":gsi3pk": `LEVEL#${levelId}`,
+          ":sk": sortKeyPrefix,
+          ":pk": `USER#${userId}`,
+        },
+      })
+    );
+
+    console.log("INFO: Fetched messages for user at level:", {
+      userId,
+      levelId,
+      count: result.Count,
+    });
+
     return (
       result.Items?.map((item) => {
-        const {
-          PK,
-          SK,
-          GSI1PK,
-          GSI1SK,
-          GSI2PK,
-          GSI2SK,
-          GSI3PK,
-          GSI3SK,
-          ItemType,
-          ...message
-        } = item;
-        return message as Message;
+        const { id, created_at, role, content } = item;
+
+        console.log("DEBUG: DynamoDB Message item:", item);
+
+        return {
+          id,
+          createdAt: created_at,
+          role,
+          content,
+        };
       }) || []
     );
   }
 
-  static async getByTeamId(teamId: string, limit?: number): Promise<Message[]> {
+  static async getFirstMessageForTeamAndLevel(
+    teamId: string,
+    levelId: string
+  ): Promise<SharedMessage | null> {
     const result = await docClient.send(
       new QueryCommand({
         TableName: DUCK_HUNT_TABLE_NAME,
         IndexName: "GSI1",
         KeyConditionExpression:
           "GSI1PK = :gsi1pk AND begins_with(GSI1SK, :gsi1sk)",
+        // include soft deleted messages in query - used for time since first message
+        FilterExpression: "level_id = :levelId",
         ExpressionAttributeValues: {
           ":gsi1pk": `TEAM#${teamId}`,
           ":gsi1sk": "MESSAGE#",
+          ":levelId": levelId,
         },
-        ScanIndexForward: false,
-        Limit: limit,
+        Limit: 1,
+        ScanIndexForward: true, // oldest first
       })
     );
 
-    return (
-      result.Items?.map((item) => {
-        const {
-          PK,
-          SK,
-          GSI1PK,
-          GSI1SK,
-          GSI2PK,
-          GSI2SK,
-          GSI3PK,
-          GSI3SK,
-          ItemType,
-          ...message
-        } = item;
-        return message as Message;
-      }) || []
-    );
-  }
+    console.log("INFO: Fetched first message for team at level:", result.Items);
 
-  static async getByGameId(gameId: string, limit?: number): Promise<Message[]> {
-    const result = await docClient.send(
-      new QueryCommand({
-        TableName: DUCK_HUNT_TABLE_NAME,
-        IndexName: "GSI2",
-        KeyConditionExpression:
-          "GSI2PK = :gsi2pk AND begins_with(GSI2SK, :gsi2sk)",
-        ExpressionAttributeValues: {
-          ":gsi2pk": `GAME#${gameId}`,
-          ":gsi2sk": "MESSAGE#",
-        },
-        ScanIndexForward: false,
-        Limit: limit,
-      })
-    );
+    if (!result.Items || result.Items.length === 0) {
+      console.warn(`No messages found for team ${teamId} at level ${levelId}.`);
+      return null;
+    }
 
-    return (
-      result.Items?.map((item) => {
-        const {
-          PK,
-          SK,
-          GSI1PK,
-          GSI1SK,
-          GSI2PK,
-          GSI2SK,
-          GSI3PK,
-          GSI3SK,
-          ItemType,
-          ...message
-        } = item;
-        return message as Message;
-      }) || []
-    );
-  }
-
-  static async getByLevelId(
-    levelId: string,
-    limit?: number
-  ): Promise<Message[]> {
-    const result = await docClient.send(
-      new QueryCommand({
-        TableName: DUCK_HUNT_TABLE_NAME,
-        IndexName: "GSI3",
-        KeyConditionExpression:
-          "GSI3PK = :gsi3pk AND begins_with(GSI3SK, :gsi3sk)",
-        ExpressionAttributeValues: {
-          ":gsi3pk": `LEVEL#${levelId}`,
-          ":gsi3sk": "MESSAGE#",
-        },
-        ScanIndexForward: false,
-        Limit: limit,
-      })
-    );
-
-    return (
-      result.Items?.map((item) => {
-        const {
-          PK,
-          SK,
-          GSI1PK,
-          GSI1SK,
-          GSI2PK,
-          GSI2SK,
-          GSI3PK,
-          GSI3SK,
-          ItemType,
-          ...message
-        } = item;
-        return message as Message;
-      }) || []
-    );
+    const firstMessage = result.Items[0];
+    return {
+      id: firstMessage.id,
+      createdAt: firstMessage.created_at,
+      role: firstMessage.role,
+      content: firstMessage.content,
+    };
   }
 }

@@ -52,6 +52,7 @@ export class ApiResources extends Construct {
         externalModules: ["@aws-sdk/*"],
         nodeModules: [],
       },
+      timeout: cdk.Duration.seconds(30),
       environment: {
         DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
       },
@@ -62,6 +63,12 @@ export class ApiResources extends Construct {
       }),
     });
     props.duckHuntTable.grantReadWriteData(messageLambda);
+    messageLambda.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["bedrock:InvokeModel"],
+        resources: ["*"],
+      })
+    );
     const messageLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
       messageLambda
     );
@@ -77,6 +84,7 @@ export class ApiResources extends Construct {
         externalModules: ["@aws-sdk/*"],
         nodeModules: [],
       },
+      timeout: cdk.Duration.seconds(30),
       environment: {
         DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
       },
@@ -87,6 +95,12 @@ export class ApiResources extends Construct {
       }),
     });
     props.duckHuntTable.grantReadWriteData(levelLambda);
+    levelLambda.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["bedrock:InvokeModel"],
+        resources: ["*"],
+      })
+    );
     const levelLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
       levelLambda
     );
@@ -102,6 +116,7 @@ export class ApiResources extends Construct {
         externalModules: ["@aws-sdk/*"],
         nodeModules: [],
       },
+      timeout: cdk.Duration.seconds(30),
       environment: {
         DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
       },
@@ -112,6 +127,12 @@ export class ApiResources extends Construct {
       }),
     });
     props.duckHuntTable.grantReadWriteData(clearChatLambda);
+    clearChatLambda.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["bedrock:InvokeModel"],
+        resources: ["*"],
+      })
+    );
     const clearChatLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
       clearChatLambda
     );
@@ -141,6 +162,12 @@ export class ApiResources extends Construct {
       }
     );
     props.duckHuntTable.grantReadWriteData(pingCoordinatesLambda);
+    pingCoordinatesLambda.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["bedrock:InvokeModel"],
+        resources: ["*"],
+      })
+    );
     const pingCoordinatesLambdaIntegration =
       new cdk.aws_apigateway.LambdaIntegration(pingCoordinatesLambda);
     pingCoordinatesResource.addMethod("POST", pingCoordinatesLambdaIntegration);
@@ -155,6 +182,7 @@ export class ApiResources extends Construct {
     //     externalModules: ["@aws-sdk/*"],
     //     nodeModules: [],
     //   },
+    //   timeout: cdk.Duration.seconds(30),
     //   environment: {
     //     DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
     //     PHOTO_BUCKET: props.photoBucket.bucketName,

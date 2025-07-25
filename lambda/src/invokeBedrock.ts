@@ -3,13 +3,23 @@ import {
   InvokeModelCommand,
 } from "@aws-sdk/client-bedrock-runtime";
 import { Message, MessageRole, UUID } from "@shared/types";
+import { v4 } from "uuid";
 import { LevelOperations } from "./dynamo/level";
+import { MessageOperations } from "./dynamo/message";
 
 const bedrockClient = new BedrockRuntimeClient({
-  region: process.env.AWS_REGION || "us-west-2", // Default to us-west-2 for Claude 3.5 Haiku
+  region: process.env.AWS_REGION || "us-west-2",
 });
 
 const MODEL_ID = "anthropic.claude-3-5-haiku-20241022-v1:0";
+
+export interface InvokeBedrockPersistToDynamoProps {
+  userId: UUID;
+  teamId: UUID;
+  levelId: UUID;
+  gameId: UUID;
+  newUserMessage: Message<MessageRole.User>;
+}
 
 export interface InvokeBedrockProps {
   levelId: UUID;
@@ -17,8 +27,7 @@ export interface InvokeBedrockProps {
 }
 
 export interface InvokeBedrockResponse {
-  bedrockResponseMessage: Message<MessageRole.Assistant>; // {id} is latest id + 1
-  bedrockFailed: boolean;
+  bedrockResponseMessage: Message<MessageRole.Assistant>;
 }
 
 /**
@@ -50,48 +59,38 @@ const buildSystemPrompt = (levelData: any): string => {
     )}.`;
   }
 
-  systemPrompt += ` Stay in character while helping players with their scavenger hunt adventure. Be engaging and provide helpful guidance without giving away answers too easily.`;
+  systemPrompt += ` Stay in character while helping players with their scavenger hunt adventure. Be engaging and provide helpful guidance without giving away answers too easily. Keep responses relatively short.`;
 
   return systemPrompt;
 };
 
 /**
  * Invoke bedrock with message history and system prompt from s3
- * @param InvokeBedrockProps {InvokeBedrockProps}
- * @returns InvokeBedrockResponse {InvokeBedrockResponse}
  */
-export const invokeBedrock = async ({
+const invokeBedrock = async ({
   levelId,
   messageHistory,
 }: InvokeBedrockProps): Promise<InvokeBedrockResponse> => {
+  console.log(
+    `INFO: Invoking Bedrock for level ${levelId} with ${messageHistory.length} message(s)`
+  );
+  const nextMessageId = v4() as UUID;
+
   try {
-    // Get the last message ID for generating the next message ID
-    const lastMessage =
-      messageHistory.length > 0
-        ? messageHistory[messageHistory.length - 1]
-        : null;
-    const nextMessageId = lastMessage ? lastMessage.id + 1 : 1;
-
-    // Retrieve level data from DynamoDB using levelId
     const levelData = await LevelOperations.getByLevelId(levelId);
-
     if (!levelData) {
+      // TODO: Return a clue from dynamo if level not found
       throw new Error(`Level not found for ID: ${levelId}`);
     }
 
-    // Build comprehensive system prompt from level data
     const systemPrompt = buildSystemPrompt(levelData);
+    const maxTokens = levelData.max_tokens || 128;
 
-    // Get max_tokens from level configuration, default to 512
-    const maxTokens = levelData.max_tokens || 512;
-
-    // Convert message history to Claude format
     const messages = messageHistory.map((msg) => ({
       role: msg.role === MessageRole.User ? "user" : "assistant",
       content: msg.content,
     }));
 
-    // Prepare the request body for Claude 3.5 Haiku
     const requestBody = {
       anthropic_version: "bedrock-2023-05-31",
       max_tokens: maxTokens,
@@ -100,7 +99,10 @@ export const invokeBedrock = async ({
       temperature: 0.7,
     };
 
-    // Invoke Bedrock with Claude 3.5 Haiku
+    console.log(
+      `INFO: Sending request to Bedrock with system prompt and ${messages.length} message(s)`
+    );
+
     const command = new InvokeModelCommand({
       modelId: MODEL_ID,
       body: JSON.stringify(requestBody),
@@ -114,8 +116,9 @@ export const invokeBedrock = async ({
       throw new Error("No response body from Bedrock");
     }
 
-    // Parse the response
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+
+    console.log(`INFO: Received response from Bedrock:`, responseBody);
 
     if (
       !responseBody.content ||
@@ -133,23 +136,19 @@ export const invokeBedrock = async ({
     };
 
     console.log(
-      `Successfully invoked Bedrock for level ${levelId} with character: ${levelData.character.name}`
+      `INFO: Successfully invoked Bedrock for level ${levelId} with character: ${levelData.character.name}`
     );
 
     return {
       bedrockResponseMessage: responseMessage,
-      bedrockFailed: false,
     };
   } catch (error) {
-    console.error(`Bedrock invocation failed for level ${levelId}:`, error);
+    console.error(
+      `ERROR: Bedrock invocation failed for level ${levelId}:`,
+      error
+    );
 
-    // Return a fallback message on failure
-    const lastMessage =
-      messageHistory.length > 0
-        ? messageHistory[messageHistory.length - 1]
-        : null;
-    const nextMessageId = lastMessage ? lastMessage.id + 1 : 1;
-
+    // TODO: If dynamo error, return hardcoded response
     const fallbackMessage: Message<MessageRole.Assistant> = {
       id: nextMessageId,
       role: MessageRole.Assistant,
@@ -160,7 +159,100 @@ export const invokeBedrock = async ({
 
     return {
       bedrockResponseMessage: fallbackMessage,
-      bedrockFailed: true,
+    };
+  }
+};
+
+export const invokeBedrockPersistToDynamo = async ({
+  gameId,
+  levelId,
+  userId,
+  teamId,
+  newUserMessage,
+}: InvokeBedrockPersistToDynamoProps): Promise<InvokeBedrockResponse> => {
+  try {
+    // Get existing message history from DynamoDB
+    let messageHistory: Array<Message> = [];
+
+    try {
+      messageHistory = await MessageOperations.getForUserAtLevel(
+        userId,
+        levelId
+      );
+    } catch (error) {
+      console.warn(
+        `Could not retrieve message history for level ${levelId}:`,
+        error
+      );
+      // Continue with empty message history
+    }
+
+    // Persist new user message to DynamoDB
+    try {
+      await MessageOperations.create({
+        game_id: gameId,
+        user_id: userId,
+        team_id: teamId,
+        level_id: levelId,
+        content: newUserMessage.content,
+        role: newUserMessage.role,
+      });
+      messageHistory.push(newUserMessage);
+
+      console.log(`INFO: Persisted user message for level ${levelId}`);
+    } catch (error) {
+      console.error(
+        `ERROR: Failed to persist user message for level ${levelId}:`,
+        error
+      );
+      // Continue anyway - we'll still try to get a response from Bedrock
+    }
+
+    // Invoke Bedrock with the message history
+    const { bedrockResponseMessage } = await invokeBedrock({
+      levelId,
+      messageHistory,
+    });
+
+    // Persist Bedrock's response message to DynamoDB (regardless of whether it failed)
+    try {
+      await MessageOperations.create({
+        game_id: gameId,
+        user_id: userId,
+        team_id: teamId,
+        level_id: levelId,
+        content: bedrockResponseMessage.content,
+        role: bedrockResponseMessage.role,
+      });
+      console.log(
+        `INFO: Persisted Bedrock response message for level ${levelId}`
+      );
+    } catch (error) {
+      console.error(
+        `ERROR: Failed to persist Bedrock response message for level ${levelId}:`,
+        error
+      );
+      // Don't fail the entire operation if we can't persist the response
+    }
+
+    return { bedrockResponseMessage };
+  } catch (error) {
+    console.error(
+      `ERROR: invokeBedrockPersistToDynamo failed for level ${levelId}:`,
+      error
+    );
+
+    // Return a hardcoded fallback response
+    const fallbackMessage: Message<MessageRole.Assistant> = {
+      id: v4() as UUID,
+      role: MessageRole.Assistant,
+      content:
+        "I'm experiencing technical difficulties right now. Please try again in a moment.",
+      createdAt: new Date(),
+    };
+
+    return {
+      bedrockResponseMessage: fallbackMessage,
     };
   }
 };
