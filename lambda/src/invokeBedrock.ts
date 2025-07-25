@@ -1,6 +1,7 @@
 import {
   BedrockRuntimeClient,
   InvokeModelCommand,
+  ApplyGuardrailCommand,
 } from "@aws-sdk/client-bedrock-runtime";
 import { Message, MessageRole, UUID } from "@shared/types";
 import { v4 } from "uuid";
@@ -12,6 +13,10 @@ const bedrockClient = new BedrockRuntimeClient({
 });
 
 const MODEL_ID = "anthropic.claude-3-5-haiku-20241022-v1:0";
+
+// Guardrail configuration
+const GUARDRAIL_ID = process.env.GUARDRAIL_ID || "qi5egvtmehhe";
+const GUARDRAIL_VERSION = process.env.GUARDRAIL_VERSION || "DRAFT";
 
 export interface InvokeBedrockPersistToDynamoProps {
   userId: UUID;
@@ -29,6 +34,69 @@ export interface InvokeBedrockProps {
 export interface InvokeBedrockResponse {
   bedrockResponseMessage: Message<MessageRole.Assistant>;
 }
+
+/**
+ * Apply guardrails to content
+ */
+const applyGuardrails = async (
+  content: string,
+  source: "INPUT" | "OUTPUT"
+): Promise<{
+  isBlocked: boolean;
+  filteredContent?: string;
+  reason?: string;
+}> => {
+  // Skip guardrail check if not configured
+  if (!GUARDRAIL_ID) {
+    console.warn("Guardrail ID not configured, skipping guardrail check");
+    return { isBlocked: false, filteredContent: content };
+  }
+
+  try {
+    const command = new ApplyGuardrailCommand({
+      guardrailIdentifier: GUARDRAIL_ID,
+      guardrailVersion: GUARDRAIL_VERSION,
+      source: source,
+      content: [
+        {
+          text: {
+            text: content,
+          },
+        },
+      ],
+    });
+
+    const response = await bedrockClient.send(command);
+
+    // Check if content was blocked
+    const isBlocked = response.action === "GUARDRAIL_INTERVENED";
+
+    if (isBlocked) {
+      console.log(
+        `Guardrail blocked ${source.toLowerCase()} content:`,
+        response.actionReason
+      );
+      return {
+        isBlocked: true,
+        reason:
+          response.actionReason || "Content blocked by guardrail policies",
+      };
+    }
+
+    // Get filtered content if available
+    const filteredContent = response.outputs?.[0]?.text || content;
+
+    console.log(`Guardrail approved ${source.toLowerCase()} content`);
+    return { isBlocked: false, filteredContent };
+  } catch (error) {
+    console.error(
+      `Error applying guardrails to ${source.toLowerCase()} content:`,
+      error
+    );
+    // Don't block content if guardrail check fails - log and continue
+    return { isBlocked: false, filteredContent: content };
+  }
+};
 
 /**
  * Build a comprehensive system prompt using level data
@@ -131,6 +199,43 @@ const invokeBedrock = async ({
       `INFO: Successfully invoked Bedrock for level ${levelId} with character: ${levelData.character.name}`
     );
 
+    // Apply guardrails to the LLM response
+    const guardrailCheck = await applyGuardrails(
+      responseMessage.content,
+      "OUTPUT"
+    );
+
+    if (guardrailCheck.isBlocked) {
+      console.log(
+        `INFO: LLM response blocked by guardrails for level ${levelId}:`,
+        guardrailCheck.reason
+      );
+
+      // Return a safe fallback message
+      const safeResponseMessage: Message<MessageRole.Assistant> = {
+        id: nextMessageId,
+        role: MessageRole.Assistant,
+        content:
+          "I'm sorry, but I can't provide that response. Let me help you with your scavenger hunt in a different way.",
+        createdAt: new Date(),
+      };
+
+      return {
+        bedrockResponseMessage: safeResponseMessage,
+      };
+    }
+
+    // Use filtered content if available
+    if (
+      guardrailCheck.filteredContent &&
+      guardrailCheck.filteredContent !== responseMessage.content
+    ) {
+      responseMessage.content = guardrailCheck.filteredContent;
+      console.log(
+        `INFO: LLM response content filtered by guardrails for level ${levelId}`
+      );
+    }
+
     return {
       bedrockResponseMessage: responseMessage,
     };
@@ -163,6 +268,44 @@ export const invokeBedrockPersistToDynamo = async ({
   newUserMessage,
 }: InvokeBedrockPersistToDynamoProps): Promise<InvokeBedrockResponse> => {
   try {
+    // Apply guardrails to user input first
+    const userInputGuardrailCheck = await applyGuardrails(
+      newUserMessage.content,
+      "INPUT"
+    );
+
+    if (userInputGuardrailCheck.isBlocked) {
+      console.log(
+        `INFO: User message blocked by guardrails for level ${levelId}:`,
+        userInputGuardrailCheck.reason
+      );
+
+      // Return a response indicating the message was blocked
+      const blockedResponseMessage: Message<MessageRole.Assistant> = {
+        id: v4() as UUID,
+        role: MessageRole.Assistant,
+        content:
+          "I can't process that message due to content policies. Please rephrase your question or comment, and I'll be happy to help with your scavenger hunt!",
+        createdAt: new Date(),
+      };
+
+      return {
+        bedrockResponseMessage: blockedResponseMessage,
+      };
+    }
+
+    // Use filtered content if available
+    let processedUserMessage = { ...newUserMessage };
+    if (
+      userInputGuardrailCheck.filteredContent &&
+      userInputGuardrailCheck.filteredContent !== newUserMessage.content
+    ) {
+      processedUserMessage.content = userInputGuardrailCheck.filteredContent;
+      console.log(
+        `INFO: User message content filtered by guardrails for level ${levelId}`
+      );
+    }
+
     // Get existing message history from DynamoDB
     let messageHistory: Array<Message> = [];
 
@@ -179,17 +322,17 @@ export const invokeBedrockPersistToDynamo = async ({
       // Continue with empty message history
     }
 
-    // Persist new user message to DynamoDB
+    // Persist new user message to DynamoDB (use original content for storage)
     try {
       await MessageOperations.create({
         game_id: gameId,
         user_id: userId,
         team_id: teamId,
         level_id: levelId,
-        content: newUserMessage.content,
+        content: newUserMessage.content, // Store original user content
         role: newUserMessage.role,
       });
-      messageHistory.push(newUserMessage);
+      messageHistory.push(processedUserMessage); // Use filtered content for LLM
 
       console.log(`INFO: Persisted user message for level ${levelId}`);
     } catch (error) {
@@ -200,7 +343,7 @@ export const invokeBedrockPersistToDynamo = async ({
       // Continue anyway - we'll still try to get a response from Bedrock
     }
 
-    // Invoke Bedrock with the message history
+    // Invoke Bedrock with the message history (including filtered user message)
     const { bedrockResponseMessage } = await invokeBedrock({
       levelId,
       messageHistory,
