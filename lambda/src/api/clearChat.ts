@@ -1,5 +1,7 @@
 import {
   corsHeaders,
+  MessageResponseBody,
+  MessageRole,
   RequestHeaders,
   ResponseError,
   UUID,
@@ -7,6 +9,7 @@ import {
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { MessageOperations } from "src/dynamo/message";
 import { respondByLevelTime } from "src/respondByLevelTime";
+import { v4 } from "uuid";
 import { fetchBaseData } from "./fetchBaseData";
 
 /**
@@ -57,6 +60,24 @@ export const handler = async (
             "You have completed all levels. Contact support for assistance.",
           details: "No current level found for the team.",
         } as ResponseError),
+      };
+    }
+
+    if (currentTeamLevel.completed_at) {
+      const messageResponse: MessageResponseBody = {
+        message: {
+          id: v4() as UUID,
+          role: MessageRole.Assistant,
+          content: "Congratulations! You have completed the Duck Hunt!",
+          createdAt: new Date(),
+        },
+        mapLink: null,
+      };
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify(messageResponse),
       };
     }
 

@@ -241,6 +241,8 @@ export default function Chat() {
     >
       {/* Team Photo Upload Modal */}
       <Modal
+        closeOnClickOutside={false}
+        closeButtonProps={{ style: { display: "none" } }}
         opened={needsTeamPhoto}
         onClose={() => setNeedsTeamPhoto(false)}
         title="Team Photo Required"

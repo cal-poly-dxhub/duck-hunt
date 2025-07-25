@@ -11,12 +11,12 @@ import { MessageOperations } from "src/dynamo/message";
 import { TeamLevel, TeamLevelOperations } from "src/dynamo/teamLevel";
 import { UserOperations } from "src/dynamo/user";
 
-interface BaseDataResponse {
+type BaseDataResponse = {
   currentTeamLevel: TeamLevel;
   currentLevel: Level;
   gameId: UUID;
   userMessages: Array<Message>;
-}
+};
 
 /**
  * Fetch base data for given user and team.

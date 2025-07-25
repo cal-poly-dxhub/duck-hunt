@@ -45,7 +45,7 @@ export class TeamLevelOperations {
     return teamLevel;
   }
 
-  static async getCurrentForTeam(teamId: string): Promise<TeamLevel | null> {
+  static async getCurrentForTeam(teamId: string): Promise<TeamLevel> {
     try {
       const response = await docClient.send(
         new QueryCommand({
@@ -61,8 +61,20 @@ export class TeamLevelOperations {
 
       console.log("INFO: Current team level response:", response);
 
-      if (!response.Items?.length) {
-        return null;
+      if (!response.Items || response.Items.length === 0) {
+        // no items, check if there are any levels for the team
+        const allTeamLevels = await this.getAllForTeam(teamId);
+
+        if (!allTeamLevels.length) {
+          console.error(`ERROR: No levels found for team ${teamId}.`);
+          throw new Error(`No levels found for team: ${teamId}`);
+        }
+
+        // all levels are completed, return the last level
+        const sortedLevels = allTeamLevels.sort((a, b) => a.index - b.index);
+
+        // return last level
+        return sortedLevels[sortedLevels.length - 1];
       }
 
       // Find the level with the minimum index (most efficient for small datasets)

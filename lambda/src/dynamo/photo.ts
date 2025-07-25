@@ -3,9 +3,9 @@ import { v4 as uuidv4 } from "uuid";
 import {
   BaseEntity,
   docClient,
+  DUCK_HUNT_TABLE_NAME,
   getCurrentTimestamp,
   getEpochTimestamp,
-  DUCK_HUNT_TABLE_NAME,
 } from ".";
 
 export interface Photo extends BaseEntity {
@@ -52,109 +52,6 @@ export class PhotoOperations {
     );
 
     return photo;
-  }
-
-  static async getByUserId(userId: string, limit?: number): Promise<Photo[]> {
-    const result = await docClient.send(
-      new QueryCommand({
-        TableName: DUCK_HUNT_TABLE_NAME,
-        KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
-        ExpressionAttributeValues: {
-          ":pk": `USER#${userId}`,
-          ":sk": "PHOTO#",
-        },
-        ScanIndexForward: false,
-        Limit: limit,
-      })
-    );
-
-    return (
-      result.Items?.map((item) => {
-        const {
-          PK,
-          SK,
-          GSI1PK,
-          GSI1SK,
-          GSI2PK,
-          GSI2SK,
-          GSI3PK,
-          GSI3SK,
-          ItemType,
-          ...photo
-        } = item;
-        return photo as Photo;
-      }) || []
-    );
-  }
-
-  static async getByTeamId(teamId: string, limit?: number): Promise<Photo[]> {
-    const result = await docClient.send(
-      new QueryCommand({
-        TableName: DUCK_HUNT_TABLE_NAME,
-        IndexName: "GSI1",
-        KeyConditionExpression:
-          "GSI1PK = :gsi1pk AND begins_with(GSI1SK, :gsi1sk)",
-        ExpressionAttributeValues: {
-          ":gsi1pk": `TEAM#${teamId}`,
-          ":gsi1sk": "PHOTO#",
-        },
-        ScanIndexForward: false,
-        Limit: limit,
-      })
-    );
-
-    return (
-      result.Items?.map((item) => {
-        const {
-          PK,
-          SK,
-          GSI1PK,
-          GSI1SK,
-          GSI2PK,
-          GSI2SK,
-          GSI3PK,
-          GSI3SK,
-          ItemType,
-          ...photo
-        } = item;
-        return photo as Photo;
-      }) || []
-    );
-  }
-
-  static async getByGameId(gameId: string, limit?: number): Promise<Photo[]> {
-    const result = await docClient.send(
-      new QueryCommand({
-        TableName: DUCK_HUNT_TABLE_NAME,
-        IndexName: "GSI2",
-        KeyConditionExpression:
-          "GSI2PK = :gsi2pk AND begins_with(GSI2SK, :gsi2sk)",
-        ExpressionAttributeValues: {
-          ":gsi2pk": `GAME#${gameId}`,
-          ":gsi2sk": "PHOTO#",
-        },
-        ScanIndexForward: false,
-        Limit: limit,
-      })
-    );
-
-    return (
-      result.Items?.map((item) => {
-        const {
-          PK,
-          SK,
-          GSI1PK,
-          GSI1SK,
-          GSI2PK,
-          GSI2SK,
-          GSI3PK,
-          GSI3SK,
-          ItemType,
-          ...photo
-        } = item;
-        return photo as Photo;
-      }) || []
-    );
   }
 
   static async getByLevelId(levelId: string, limit?: number): Promise<Photo[]> {

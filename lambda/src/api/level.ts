@@ -10,6 +10,7 @@ import {
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { Level } from "src/dynamo/level";
 import { MessageOperations } from "src/dynamo/message";
+import { PhotoOperations } from "src/dynamo/photo";
 import { TeamLevel, TeamLevelOperations } from "src/dynamo/teamLevel";
 import { invokeBedrockPersistToDynamo } from "src/invokeBedrock";
 import { v4 } from "uuid";
@@ -221,6 +222,90 @@ export const handler = async (
       eventBody.levelId
     );
 
+    if (currentTeamLevel.completed_at) {
+      console.log(
+        "INFO: Current team level is already completed, returning completion message."
+      );
+
+      const messageResponse: LevelResponseBody = {
+        currentTeamLevel: currentTeamLevel.id as UUID,
+        messageHistory: [
+          {
+            id: v4() as UUID,
+            role: MessageRole.Assistant,
+            content: "Congratulations! You have completed the Duck Hunt!",
+            createdAt: new Date(),
+          },
+        ],
+        requiresPhoto: false,
+        mapLink: null,
+      };
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify(messageResponse),
+      };
+    }
+
+    // get all team levels
+    const allTeamLevels = await TeamLevelOperations.getAllForTeam(
+      headers["team-id"] as UUID
+    );
+
+    console.log("INFO: All team levels:", allTeamLevels);
+
+    // check if photo from previous level is in database
+    const sortedTeamLevels = allTeamLevels.sort((a, b) =>
+      a.level_id.localeCompare(b.level_id)
+    );
+    const completedTeamLevels = sortedTeamLevels.filter(
+      (level) => level.completed_at !== null
+    );
+
+    // check if most recently completed level has a photo in the database
+    if (completedTeamLevels.length > 0) {
+      console.log(
+        "INFO: Checking for photos in most recently completed level:",
+        completedTeamLevels[completedTeamLevels.length - 1].level_id
+      );
+
+      const photos = await PhotoOperations.getByLevelId(
+        completedTeamLevels[completedTeamLevels.length - 1].level_id
+      );
+
+      console.log(
+        "INFO: Found " +
+          photos.length +
+          " photos for most recently completed level."
+      );
+
+      if (photos.length === 0) {
+        console.warn(
+          "WARN: No photos found for most recently completed level:",
+          completedTeamLevels[completedTeamLevels.length - 1].level_id
+        );
+
+        const messageHistory = await MessageOperations.getForUserAtLevel(
+          headers["user-id"] as UUID,
+          completedTeamLevels[completedTeamLevels.length - 1].level_id
+        );
+
+        const responseBody: LevelResponseBody = {
+          currentTeamLevel: currentTeamLevel.id as UUID,
+          messageHistory: messageHistory.slice(1), // omit first user message
+          requiresPhoto: true,
+          mapLink: null,
+        };
+
+        return {
+          statusCode: 200,
+          headers: corsHeaders,
+          body: JSON.stringify(responseBody),
+        };
+      }
+    }
+
     if (!eventBody.levelId) {
       console.log(
         "INFO: No levelId provided in request body, returning current level data."
@@ -236,16 +321,6 @@ export const handler = async (
         currentLevel,
       });
     }
-
-    const allTeamLevels = await TeamLevelOperations.getAllForTeam(
-      headers["team-id"] as UUID
-    );
-
-    console.log("INFO: All team levels:", allTeamLevels);
-
-    const completedTeamLevels = allTeamLevels.filter(
-      (level) => level.completed_at !== null
-    );
 
     if (eventBody.levelId === currentLevel.id) {
       console.log(
