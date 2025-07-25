@@ -168,29 +168,26 @@ export class MessageOperations {
         IndexName: "GSI1",
         KeyConditionExpression:
           "GSI1PK = :gsi1pk AND begins_with(GSI1SK, :gsi1sk)",
-        FilterExpression: "GSI2PK = :gsi2pk",
+        // include soft deleted messages in query - used for time since first message
+        FilterExpression: "level_id = :levelId",
         ExpressionAttributeValues: {
           ":gsi1pk": `TEAM#${teamId}`,
           ":gsi1sk": "MESSAGE#",
-          ":gsi2pk": `GAME#${levelId}`,
+          ":levelId": levelId,
         },
+        Limit: 1,
+        ScanIndexForward: true, // oldest first
       })
     );
 
-    const sortedItems = result.Items?.sort((a, b) => {
-      return (
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      );
-    });
+    console.log("INFO: Fetched first message for team at level:", result.Items);
 
-    console.log("INFO: Sorted messages for team at level:", sortedItems);
-
-    if (!sortedItems || sortedItems.length === 0) {
+    if (!result.Items || result.Items.length === 0) {
       console.warn(`No messages found for team ${teamId} at level ${levelId}.`);
       return null;
     }
 
-    const firstMessage = sortedItems[0];
+    const firstMessage = result.Items[0];
     return {
       id: firstMessage.id,
       createdAt: firstMessage.created_at,

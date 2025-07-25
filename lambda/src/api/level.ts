@@ -37,20 +37,76 @@ const respondByLevelTimeLevelResponse = async ({
   currentTeamLevel,
   currentLevel,
 }: RespondByLevelTimeLevelResponseProps): Promise<APIGatewayProxyResult> => {
+  console.log("INFO: Responding by level time (level response) with:", {
+    gameId,
+    userId,
+    teamId,
+    messageHistory,
+    currentTeamLevel,
+    currentLevel,
+  });
+
   const firstTeamMessageForCurrentLevel =
     await MessageOperations.getFirstMessageForTeamAndLevel(
       teamId,
       currentLevel.id as UUID
     );
 
-  if (
-    !firstTeamMessageForCurrentLevel ||
-    new Date(firstTeamMessageForCurrentLevel.createdAt).getTime() <
-      Date.now() - 10 * 60 * 1000
-  ) {
+  const minutesOnLevel = firstTeamMessageForCurrentLevel
+    ? Math.floor(
+        (Date.now() -
+          new Date(firstTeamMessageForCurrentLevel.createdAt).getTime()) /
+          (60 * 1000)
+      )
+    : 0;
+
+  console.log(
+    "INFO: First team message for current level:",
+    firstTeamMessageForCurrentLevel
+  );
+
+  console.log("INFO: Minutes on level:", minutesOnLevel);
+  if (minutesOnLevel < 10) {
     if (!firstTeamMessageForCurrentLevel) {
       console.warn("WARN: No messages found for team at current level.");
+    } else {
+      const minutesOnLevel = Math.floor(
+        (Date.now() -
+          new Date(firstTeamMessageForCurrentLevel.createdAt).getTime()) /
+          (60 * 1000)
+      );
+      console.log(
+        "INFO: Team has been on level for:",
+        minutesOnLevel,
+        "minutes"
+      );
     }
+
+    if (messageHistory.length > 0) {
+      console.warn(
+        "INFO: User has messages at current level, returning existing messages."
+      );
+
+      const levelResponse: LevelResponseBody = {
+        currentTeamLevel: currentTeamLevel.id as UUID,
+        messageHistory: messageHistory.slice(1), // omit first user message
+        requiresPhoto: false,
+        mapLink: null,
+      };
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify(levelResponse),
+      };
+    }
+
+    const newUserMessage: Message<MessageRole.User> = {
+      id: v4() as UUID,
+      role: MessageRole.User,
+      content: "Hello. Introduce yourself and your job.",
+      createdAt: new Date(),
+    };
 
     // been on level for <10 minutes
     const { bedrockResponseMessage } = await invokeBedrockPersistToDynamo({
@@ -58,18 +114,17 @@ const respondByLevelTimeLevelResponse = async ({
       levelId: currentLevel.id as UUID,
       userId,
       teamId,
-      newUserMessage: {
-        id: v4() as UUID,
-        role: MessageRole.User,
-        content: "Hello. Introduce yourself and your job.",
-        createdAt: new Date(),
-      },
+      newUserMessage,
     });
 
     // sending bad message
     const levelResponse: LevelResponseBody = {
       currentTeamLevel: currentTeamLevel.id as UUID,
-      messageHistory: [...messageHistory, bedrockResponseMessage].slice(1), // omit first user message
+      messageHistory: [
+        ...messageHistory,
+        newUserMessage,
+        bedrockResponseMessage,
+      ].slice(1), // omit first user message
       requiresPhoto: false,
       mapLink: null,
     };
@@ -79,12 +134,11 @@ const respondByLevelTimeLevelResponse = async ({
       headers: corsHeaders,
       body: JSON.stringify(levelResponse),
     };
-  } else if (
-    new Date(firstTeamMessageForCurrentLevel.createdAt).getTime() <
-    Date.now() - 15 * 60 * 1000
-  ) {
+  } else if (minutesOnLevel > 10 && minutesOnLevel <= 15) {
     // been on level for >10 minutes, <15 minutes
-    console.warn("WARN: User has been on the level for more than 10 minutes.");
+    console.warn(
+      "WARN: User has been on the level for more than 10 minutes (<15 minutes)."
+    );
 
     // Pick a random easy clue from currentLevel.easyClues
     const easyClues = currentLevel.easyClues || [];
@@ -92,13 +146,15 @@ const respondByLevelTimeLevelResponse = async ({
     const randomClueMessage: Message<MessageRole.Assistant> = {
       id: v4() as UUID,
       role: MessageRole.Assistant,
-      content: randomClue,
+      content: "Here's a clue to help you out: " + randomClue,
       createdAt: new Date(),
     };
 
     const easyClueLevelResponse: LevelResponseBody = {
       currentTeamLevel: currentTeamLevel.id as UUID,
-      messageHistory: [...messageHistory, randomClueMessage].slice(1), // omit first user message
+      messageHistory: [...messageHistory, randomClueMessage].slice(
+        messageHistory.length > 0 ? 1 : 0
+      ), // omit first user message if history exists
       requiresPhoto: false,
       mapLink: null,
     };
@@ -112,9 +168,20 @@ const respondByLevelTimeLevelResponse = async ({
     // been on level for >15 minutes
     console.warn("WARN: User has been on the level for more than 15 minutes.");
 
+    const hardMessage: Message<MessageRole.Assistant> = {
+      id: v4() as UUID,
+      role: MessageRole.Assistant,
+      content:
+        "You have been on this level for a while. Here is a link to help you out: " +
+        currentLevel.mapLink,
+      createdAt: new Date(),
+    };
+
     const mapLinkLevelResponse: LevelResponseBody = {
       currentTeamLevel: currentLevel.id as UUID,
-      messageHistory: messageHistory.slice(1), // omit first user message
+      messageHistory: [...messageHistory, hardMessage].slice(
+        messageHistory.length > 0 ? 1 : 0
+      ), // omit first user message if history exists
       requiresPhoto: false,
       mapLink: currentLevel.mapLink,
     };

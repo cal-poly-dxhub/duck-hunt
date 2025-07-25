@@ -29,19 +29,39 @@ export const respondByLevelTime = async ({
   teamId,
   currentLevel,
 }: RespondByLevelTimeProps): Promise<APIGatewayProxyResult> => {
+  console.log("INFO: Responding by level time (message response) with:", {
+    gameId,
+    userId,
+    teamId,
+    currentLevel,
+  });
+
   const firstTeamMessageForCurrentLevel =
     await MessageOperations.getFirstMessageForTeamAndLevel(
       teamId,
       currentLevel.id as UUID
     );
 
-  if (
-    !firstTeamMessageForCurrentLevel ||
-    new Date(firstTeamMessageForCurrentLevel.createdAt).getTime() <
-      Date.now() - 10 * 60 * 1000
-  ) {
+  const minutesOnLevel = firstTeamMessageForCurrentLevel
+    ? Math.floor(
+        (Date.now() -
+          new Date(firstTeamMessageForCurrentLevel.createdAt).getTime()) /
+          (60 * 1000)
+      )
+    : 0;
+
+  console.log(
+    "INFO: First team message for current level:",
+    firstTeamMessageForCurrentLevel
+  );
+
+  console.log("INFO: Minutes on level:", minutesOnLevel);
+
+  if (minutesOnLevel < 10) {
     if (!firstTeamMessageForCurrentLevel) {
       console.warn("WARN: No messages found for team at current level.");
+    } else {
+      console.log("INFO: User has been on the level for less than 10 minutes.");
     }
 
     // been on level for <10 minutes
@@ -71,12 +91,10 @@ export const respondByLevelTime = async ({
         mapLink: null,
       } as MessageResponseBody),
     };
-  } else if (
-    new Date(firstTeamMessageForCurrentLevel.createdAt).getTime() <
-    Date.now() - 15 * 60 * 1000
-  ) {
-    // been on level for >10 minutes, <15 minutes
-    console.warn("WARN: User has been on the level for more than 10 minutes.");
+  } else if (minutesOnLevel > 10 && minutesOnLevel <= 15) {
+    console.warn(
+      "WARN: User has been on the level for more than 10 minutes (<15 minutes)."
+    );
 
     // Pick a random easy clue from currentLevel.easyClues
     const easyClues = currentLevel.easyClues || [];
@@ -89,7 +107,7 @@ export const respondByLevelTime = async ({
         message: {
           id: v4(),
           role: MessageRole.Assistant,
-          content: randomClue,
+          content: "Here's a clue to help you out: " + randomClue,
           createdAt: new Date(),
         },
         mapLink: null,
@@ -107,7 +125,8 @@ export const respondByLevelTime = async ({
           id: v4(),
           role: MessageRole.Assistant,
           content:
-            "You have been on this level for a while. Here's a link to the maps to help you out.",
+            "You have been on this level for a while. Here's a link to the maps to help you out: " +
+            currentLevel.mapLink,
           createdAt: new Date(),
         },
         mapLink: currentLevel.mapLink || null,

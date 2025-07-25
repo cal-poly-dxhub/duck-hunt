@@ -181,12 +181,25 @@ export default function Chat() {
   useEffect(() => {
     const handleCheckLocation = async () => {
       setMessages([loadingMessage]);
-      const { currentTeamLevel, messageHistory, requiresPhoto } =
+      const { mapLink, currentTeamLevel, messageHistory, requiresPhoto } =
         await scavengerHuntApi.level(levelIdFromUrl);
+
+      console.log("INFO: Fetched level data:", {
+        currentTeamLevel,
+        messageHistory,
+        mapLink,
+        requiresPhoto,
+      });
 
       if (requiresPhoto) {
         setNeedsTeamPhoto(true);
         return;
+      }
+
+      if (mapLink !== null) {
+        // if map link is not null, open it in a new tab
+        console.log("INFO: Opening map link:", mapLink);
+        window.open(mapLink, "_blank");
       }
 
       const systemMessage = {
@@ -204,6 +217,7 @@ export default function Chat() {
     if (teamId && userId) {
       handleCheckLocation();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, teamId, levelIdFromUrl, endSequenceFromUrl]);
 
   // ping location interval
