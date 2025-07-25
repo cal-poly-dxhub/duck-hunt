@@ -4,7 +4,7 @@
 set -e
 
 # package frontend source excluding all compiled JS/TS files, build artifacts, and other temporary files
-zip -r frontend.zip frontend/ -x \
+zip -r frontend.zip frontend/ shared/ -x \
   "frontend/node_modules/*" \
   "frontend/.next/*" \
   "frontend/out/*" \
