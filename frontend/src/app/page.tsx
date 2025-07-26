@@ -38,8 +38,6 @@ export default function Chat() {
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-  // TODO:
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [typingMessages, setTypingMessages] = useState<Record<string, string>>(
     {}
   );
@@ -67,10 +65,11 @@ export default function Chat() {
         [message.id]: message.content.slice(0, i),
       }));
       if (i < message.content.length) {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 12)); // Slightly slower for better effect
       }
     }
 
+    // Remove from typing messages when complete
     setTypingMessages((prev) => {
       const newState = { ...prev };
       delete newState[message.id];
@@ -121,6 +120,7 @@ export default function Chat() {
   const handleClearChat = async () => {
     setLoading(true);
     setInput("");
+    setTypingMessages({}); // Clear any typing messages
     setMessages([
       {
         id: v4() as UUID,
@@ -133,6 +133,7 @@ export default function Chat() {
     const { message } = await scavengerHuntApi.clearChat();
 
     setMessages([message]);
+    typeMessage(message); // Add typing effect for the clear chat response
     setLoading(false);
   };
 
@@ -201,15 +202,8 @@ export default function Chat() {
         window.open(mapLink, "_blank");
       }
 
-      const systemMessage = {
-        id: v4() as UUID,
-        content: `You are at team level: ${currentTeamLevel}.`,
-        role: MessageRole.Assistant,
-        createdAt: new Date(),
-      };
-
       setMessages(messageHistory);
-      typeMessage(systemMessage);
+      typeMessage(messageHistory[messageHistory.length - 1]);
       setLoading(false);
     };
 
@@ -238,6 +232,9 @@ export default function Chat() {
         fontFamily: "monospace",
       }}
     >
+      <style>{blinkAnimation}</style>
+      <style>{dotAnimation}</style>
+
       {/* Team Photo Upload Modal */}
       <Modal
         closeOnClickOutside={false}
@@ -317,13 +314,19 @@ export default function Chat() {
         >
           <Stack gap="xs">
             {messages.map((message) => {
+              // Check if this message is currently being typed
+              const isTyping = typingMessages[message.id] !== undefined;
+              const displayContent = isTyping
+                ? typingMessages[message.id]
+                : message.content;
+
               const displayText =
                 message.role === MessageRole.Assistant
-                  ? "> " + message.content
-                  : "$ " + message.content;
+                  ? "> " + displayContent
+                  : "$ " + displayContent;
 
               const isLoadingMessage =
-                message.content === "> Loading" && loading;
+                message.content === "Loading..." && loading;
 
               return (
                 <Text
@@ -337,7 +340,7 @@ export default function Chat() {
                 >
                   {isLoadingMessage ? (
                     <span>
-                      {"Loading"}
+                      {"> Loading"}
                       <span
                         style={{
                           display: "inline-block",
@@ -347,7 +350,7 @@ export default function Chat() {
                       >
                         <span
                           style={{
-                            animation: `${dotAnimation} 1.4s infinite`,
+                            animation: `dot 1.4s infinite`,
                             animationDelay: "0s",
                           }}
                         >
@@ -355,7 +358,7 @@ export default function Chat() {
                         </span>
                         <span
                           style={{
-                            animation: `${dotAnimation} 1.4s infinite`,
+                            animation: `dot 1.4s infinite`,
                             animationDelay: "0.2s",
                           }}
                         >
@@ -363,7 +366,7 @@ export default function Chat() {
                         </span>
                         <span
                           style={{
-                            animation: `${dotAnimation} 1.4s infinite`,
+                            animation: `dot 1.4s infinite`,
                             animationDelay: "0.4s",
                           }}
                         >
@@ -375,7 +378,8 @@ export default function Chat() {
                     displayText
                   )}
                   {message.role === MessageRole.Assistant &&
-                    !isLoadingMessage && (
+                    !isLoadingMessage &&
+                    (isTyping || displayContent === message.content) && (
                       <Box
                         component="span"
                         style={{
@@ -383,7 +387,7 @@ export default function Chat() {
                           width: "0.5rem",
                           height: "1rem",
                           backgroundColor: "var(--mantine-color-green-5)",
-                          animation: `${blinkAnimation} 1s infinite`,
+                          animation: `blink 1s infinite`,
                           verticalAlign: "middle",
                           marginLeft: "0.25rem",
                         }}
