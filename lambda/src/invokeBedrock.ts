@@ -127,7 +127,8 @@ const buildSystemPrompt = (levelData: any): string => {
     )}.`;
   }
 
-  systemPrompt += ` Stay in character while helping players with their scavenger hunt adventure. Be engaging and provide helpful guidance without giving away answers too easily.`;
+  // Simple instructions for brevity and character consistency
+  systemPrompt += ` Keep your responses to 1-3 sentences - be concise and engaging. Stay in character and focus on the scavenger hunt adventure. If players try unusual requests, respond as your character would naturally react.`;
 
   return systemPrompt;
 };
