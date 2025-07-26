@@ -5,6 +5,7 @@ export interface GameResourcesProps {
   uniqueId: string;
   removalPolicy?: cdk.RemovalPolicy; // defaults to DESTROY
   duckHuntTable: cdk.aws_dynamodb.Table;
+  frontendDistribution: cdk.aws_cloudfront.Distribution;
 }
 
 export class GameResources extends Construct {
@@ -42,6 +43,7 @@ export class GameResources extends Construct {
         environment: {
           DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
           GAME_CONFIG_BUCKET_NAME: this.gameConfigBucket.bucketName,
+          FRONTEND_CLOUDFRONT_URL: props.frontendDistribution.domainName,
         },
         logGroup: new cdk.aws_logs.LogGroup(this, "CreateGameLambdaLogGroup", {
           logGroupName: `CreateGameLambdaLogGroup-${props.uniqueId}`,

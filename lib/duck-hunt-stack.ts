@@ -45,6 +45,7 @@ export class DuckHuntStack extends cdk.Stack {
       uniqueId,
       removalPolicy: REMOVAL_POLICY,
       duckHuntTable: datastoreResources.duckHuntTable,
+      frontendDistribution: frontendResources.distribution,
     });
 
     // ------------ outputs ------------

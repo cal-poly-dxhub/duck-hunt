@@ -27,7 +27,7 @@
 | `clues`      | `array<string>`   | ✅       | Array of 3 main clues                              |
 | `easyClues`  | `array<string>`   | ✅       | Array of 2 easier clues                            |
 | `mapLink`    | `string`          | ✅       | Google Maps link to the location                   |
-| `max_tokens` | `integer`         | ✅       | Maximum tokens for AI responses (default: 128)     |
+| `max_tokens` | `integer`         | ✅       | Maximum tokens for AI responses (default: 512)     |
 
 ### Character Object
 
@@ -78,7 +78,7 @@
       ],
       "easyClues": ["Near the main street", "Close to shops"],
       "mapLink": "https://maps.google.com/?q=40.7128,-74.0060",
-      "max_tokens": 128
+      "max_tokens": 512
     }
   ]
 }

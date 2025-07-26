@@ -308,11 +308,14 @@ class GameCreationService {
     console.log(`INFO: Created ${createdTeams.length} teams`);
 
     // Create team-level assignments
-    await this.createTeamLevelAssignments(
+    const teamLevelAssignments = await this.createTeamLevelAssignments(
       createdTeams,
       createdLevels,
       validatedConfig.levelsInGame ?? validatedConfig.levels.length
     );
+
+    // Log URLs and level occurrence counts
+    this.logGameUrls(createdTeams, createdLevels, teamLevelAssignments);
 
     return {
       gameId: game.id,
@@ -324,12 +327,14 @@ class GameCreationService {
     teams: Team[],
     levels: Level[],
     levelsInGame: number
-  ): Promise<void> {
+  ): Promise<{ teamId: string; levelId: string; index: number }[]> {
     console.log("INFO: Creating team-level assignments");
 
     // The last level is the final level for all teams
     const finalLevel = levels[levels.length - 1];
     const availableLevels = levels.slice(0, -1); // All levels except the final one
+    const allAssignments: { teamId: string; levelId: string; index: number }[] =
+      [];
 
     for (const team of teams) {
       let teamLevels: any[] = [];
@@ -364,10 +369,76 @@ class GameCreationService {
       );
 
       await Promise.all(teamLevelPromises);
+
+      // Track assignments for URL logging
+      teamLevels.forEach((level, index) => {
+        allAssignments.push({
+          teamId: team.id,
+          levelId: level.id,
+          index: index,
+        });
+      });
+
       console.log(
         `INFO: Created ${teamLevels.length} level assignments for team ${team.name}`
       );
     }
+
+    return allAssignments;
+  }
+
+  private logGameUrls(
+    teams: Team[],
+    levels: Level[],
+    teamLevelAssignments: { teamId: string; levelId: string; index: number }[]
+  ): void {
+    console.log("==============================================");
+
+    // Log team URLs
+    console.log("TEAM URLS:");
+    teams.forEach((team) => {
+      console.log(
+        `team ${team.name} url: ${process.env.FRONTEND_CLOUDFRONT_URL}?team-id=${team.id}`
+      );
+    });
+
+    console.log("");
+
+    // Count level occurrences
+    const levelOccurrences = new Map<string, number>();
+    teamLevelAssignments.forEach((assignment) => {
+      const currentCount = levelOccurrences.get(assignment.levelId) || 0;
+      levelOccurrences.set(assignment.levelId, currentCount + 1);
+    });
+
+    // Log level URLs with occurrence counts and level names
+    console.log("LEVEL URLS:");
+    levels.forEach((level) => {
+      const occurrences = levelOccurrences.get(level.id) || 0;
+      console.log(
+        `level ${level.levelName} url: ${process.env.FRONTEND_CLOUDFRONT_URL}?level-id=${level.id} x${occurrences} occurrences`
+      );
+    });
+
+    // now create a json object of all the data and log it
+
+    const gameData = {
+      teams: teams.map((team) => ({
+        id: team.id,
+        name: team.name,
+        url: `${process.env.FRONTEND_CLOUDFRONT_URL}?team-id=${team.id}`,
+      })),
+      levels: levels.map((level) => ({
+        id: level.id,
+        name: level.levelName,
+        url: `${process.env.FRONTEND_CLOUDFRONT_URL}?level-id=${level.id}`,
+        occurrences: levelOccurrences.get(level.id) || 0,
+      })),
+    };
+
+    console.log("==============================================");
+    console.log("Game Data:", JSON.stringify(gameData, null, 2));
+    console.log("==============================================");
   }
 }
 

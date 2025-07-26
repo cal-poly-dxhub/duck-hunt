@@ -72,7 +72,7 @@ _Note: `ts` represents an epoch timestamp for chronological sorting._
 - **`clues` (List of Strings):** Array of main clues (minimum 3 elements)
 - **`easyClues` (List of Strings):** Array of easier clues (minimum 2 elements)
 - **`mapLink` (String):** Google Maps link to the location
-- **`max_tokens` (Number):** Maximum tokens for AI responses (default: 128)
+- **`max_tokens` (Number):** Maximum tokens for AI responses (default: 512)
 
 ---
 
@@ -118,7 +118,7 @@ _Note: `ts` represents an epoch timestamp for chronological sorting._
   ],
   "easyClues": ["Near the main street", "Close to shops"],
   "mapLink": "https://maps.google.com/?q=40.7128,-74.0060",
-  "max_tokens": 128,
+  "max_tokens": 512,
   "created_at": "2024-01-15T10:30:00Z",
   "updated_at": "2024-01-15T10:30:00Z"
 }

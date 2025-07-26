@@ -1,0 +1,208 @@
+{
+  "teams": [
+    {
+      "name": "The Mustang Detectives"
+    },
+    {
+      "name": "Poly Explorers"
+    },
+    {
+      "name": "Cal Poly Sleuths"
+    }
+  ],
+  "levelsInGame": 5,
+  "levels": [
+    {
+      "levelName": "Baker Center for Science & Mathematics",
+      "character": {
+        "name": "Professor Calculus",
+        "systemPrompt": "You are Professor Calculus, a brilliant engineering professor who speaks with precision and loves explaining technical concepts with enthusiasm."
+      },
+      "location": {
+        "description": "A modern engineering building with labs, workshops, and innovative design spaces",
+        "latitude": 35.30001991516393,
+        "longitude": -120.65930175666047
+      },
+      "clues": [
+        "Glass walls reveal students working on robotics projects inside",
+        "The building's name honors a famous computer science pioneer",
+        "3D printers and CNC machines hum constantly in the maker spaces",
+        "Solar panels cover portions of the distinctive angular roof"
+      ],
+      "easyClues": [
+        "Students build robots and machines here",
+        "It's one of the newer buildings on campus"
+      ],
+      "mapLink": "https://maps.google.com/?q=35.30001991516393,-120.65930175666047",
+      "max_tokens": 512
+    },
+    {
+      "levelName": "Kennedy Library",
+      "character": {
+        "name": "Frank Lloyd Wright",
+        "systemPrompt": "You are Frank Lloyd Wright, the legendary architect, speaking with passion about design, form, and the harmony between buildings and nature."
+      },
+      "location": {
+        "description": "A striking modernist library with distinctive concrete architecture and study spaces",
+        "latitude": 35.301804507411006,
+        "longitude": -120.66347748880307
+      },
+      "clues": [
+        "Brutalist concrete towers rise like geometric monuments",
+        "Students climb external staircases between different levels",
+        "Thousands of books and study carrels fill the interior floors",
+        "The building's stark design divides opinion across campus"
+      ],
+      "easyClues": [
+        "It's where students go to study and find books",
+        "The building looks like concrete blocks stacked together"
+      ],
+      "mapLink": "https://maps.google.com/?q=35.301804507411006,-120.66347748880307",
+      "max_tokens": 512
+    },
+    {
+      "levelName": "College of Agriculture, Food & Environmental Sciences",
+      "character": {
+        "name": "Old West Cowboy",
+        "systemPrompt": "You are an Old West cowboy who worked these lands long ago, speaking with folksy wisdom about the history and traditions of California ranching."
+      },
+      "location": {
+        "description": "Agricultural fields and barns where students learn hands-on farming and animal husbandry",
+        "latitude": 35.30297695946072,
+        "longitude": -120.66287458426085
+      },
+      "clues": [
+        "Holstein cows graze in pastures visible from the main road",
+        "Red barns house dairy operations and feed storage",
+        "Students in boots and work clothes tend to various livestock",
+        "The smell of hay and fresh earth fills the air"
+      ],
+      "easyClues": [
+        "You can see cows and other farm animals here",
+        "It smells like a working farm"
+      ],
+      "mapLink": "https://maps.google.com/?q=35.30297695946072,-120.66287458426085",
+      "max_tokens": 512
+    },
+    {
+      "levelName": "Alex G. Spanos Stadium",
+      "character": {
+        "name": "Coach Victory",
+        "systemPrompt": "You are Coach Victory, an enthusiastic athletic coach who speaks with energy about teamwork, perseverance, and Mustang pride."
+      },
+      "location": {
+        "description": "A large outdoor stadium with green turf and seating for thousands of cheering fans",
+        "latitude": 35.29860445622858,
+        "longitude": -120.66497895872213
+      },
+      "clues": [
+        "Green artificial turf stretches between white yard lines",
+        "Aluminum bleachers can seat thousands of cheering fans",
+        "A large scoreboard displays the Mustang logo prominently",
+        "The press box overlooks the field from the home side"
+      ],
+      "easyClues": [
+        "This is where the football team plays their games",
+        "It has a big field with goal posts at each end"
+      ],
+      "mapLink": "https://maps.google.com/?q=35.29860445622858,-120.66497895872213",
+      "max_tokens": 512
+    },
+    {
+      "levelName": "Recreation Center",
+      "character": {
+        "name": "Fitness Guru Maya",
+        "systemPrompt": "You are Fitness Guru Maya, an energetic wellness coach who speaks with enthusiasm about health, fitness, and living an active lifestyle."
+      },
+      "location": {
+        "description": "A modern fitness facility with pools, climbing walls, and exercise equipment",
+        "latitude": 35.298767492317324,
+        "longitude": -120.66006712656204
+      },
+      "clues": [
+        "The sound of barbells clanking echoes from the weight room",
+        "A tall climbing wall challenges students to reach new heights",
+        "Swimmers do laps in the crystal-clear pool lanes",
+        "Basketball courts host pickup games throughout the day"
+      ],
+      "easyClues": [
+        "Students come here to work out and stay fit",
+        "You can swim, climb, and lift weights here"
+      ],
+      "mapLink": "https://maps.google.com/?q= 35.298767492317324,-120.66006712656204",
+      "max_tokens": 512
+    },
+    {
+      "levelName": "University Union Plaza",
+      "character": {
+        "name": "Campus DJ",
+        "systemPrompt": "You are Campus DJ, a charismatic student who knows all the campus events and speaks with hip, current slang about student life and campus culture."
+      },
+      "location": {
+        "description": "A central outdoor plaza where students gather, eat, and attend events",
+        "latitude": 35.29971624561024,
+        "longitude": -120.65893371532594
+      },
+      "clues": [
+        "Food trucks line up serving everything from tacos to bubble tea",
+        "Students sprawl on grass with laptops and textbooks",
+        "A stage hosts live music and campus events regularly",
+        "The smell of various cuisines mingles in the open air"
+      ],
+      "easyClues": [
+        "This is where students hang out and eat lunch",
+        "There are often food trucks and events here"
+      ],
+      "mapLink": "https://maps.google.com/?q=35.29971624561024,-120.65893371532594",
+      "max_tokens": 512
+    },
+    {
+      "levelName": "Administration Building",
+      "character": {
+        "name": "Dean Wellington",
+        "systemPrompt": "You are Dean Wellington, a distinguished academic administrator who speaks formally and knowledgeably about Cal Poly's history, traditions, and institutional values."
+      },
+      "location": {
+        "description": "A stately brick building housing the university's main administrative offices",
+        "latitude": 35.301096447525865,
+        "longitude": -120.65821767229605
+      },
+      "clues": [
+        "Red brick walls reflect the California Mission architectural style",
+        "Important university decisions are made in the boardroom upstairs",
+        "Nervous students wait in the registrar's office with paperwork",
+        "Portrait paintings of past university presidents line the hallways"
+      ],
+      "easyClues": [
+        "This is where the university's main offices are located",
+        "Students come here for official paperwork and meetings"
+      ],
+      "mapLink": "https://maps.google.com/?q=35.301096447525865,-120.65821767229605",
+      "max_tokens": 512
+    },
+    {
+      "levelName": "Performing Arts Center",
+      "character": {
+        "name": "Madame Crescendo",
+        "systemPrompt": "You are Madame Crescendo, a dramatic theater director who speaks with theatrical flair and passion about the arts, creativity, and self-expression."
+      },
+      "location": {
+        "description": "An elegant venue for concerts, plays, and artistic performances",
+        "latitude": 35.29934611021783,
+        "longitude": -120.65681800905338
+      },
+      "clues": [
+        "Red velvet curtains frame the grand stage inside",
+        "Musicians practice scales and arpeggios in soundproof rooms",
+        "Costume racks overflow with period pieces and theatrical props",
+        "The lobby displays posters advertising upcoming performances"
+      ],
+      "easyClues": [
+        "Students perform plays and concerts in this building",
+        "It has a big theater with a stage and red curtains"
+      ],
+      "mapLink": "https://maps.google.com/?q=35.29934611021783,-120.65681800905338",
+      "max_tokens": 512
+    }
+  ]
+}
