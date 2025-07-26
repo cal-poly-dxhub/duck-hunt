@@ -2,6 +2,22 @@
 
 NOT a monolith anymore
 
+## Table of Contents
+
+- [Game Setup](#game-setup)
+- [Prerequisites](#prerequisites)
+- [Development](#development)
+- [Setup](#setup)
+- [Stack Development](#stack-development)
+- [Lambda Development](#lambda-development)
+- [DynamoDB Schema](#dynamodb-schema)
+- [Frontend Development](#frontend-development)
+- [Deployment](#deployment)
+
+## Game Setup
+
+See `GAME_SETUP.md` for detailed game setup instructions.
+
 ## Prerequisites
 
 1. Install [Node.js](https://nodejs.org/)
