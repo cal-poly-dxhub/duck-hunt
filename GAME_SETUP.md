@@ -6,8 +6,8 @@
 
 If using an existing stack:
 
-- Find and clear the database items
-- Delete files in photos and game config buckets
+- Delete the database items (in `ScavengerHuntData` table in DynamoDB)
+- Delete files in photos and game config buckets (in `game-config` and `photo-bucket` in S3)
 - Upload new configuration to game config bucket (see `example-config.json`)
 - Database will populate automatically
 

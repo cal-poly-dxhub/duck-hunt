@@ -393,6 +393,7 @@ class GameCreationService {
     teamLevelAssignments: { teamId: string; levelId: string; index: number }[]
   ): void {
     console.log("==============================================");
+    console.log("Game ID:", teams[0].game_id);
 
     // Log team URLs
     console.log("TEAM URLS:");
@@ -423,6 +424,7 @@ class GameCreationService {
     // now create a json object of all the data and log it
 
     const gameData = {
+      gameId: teams[0].game_id,
       teams: teams.map((team) => ({
         id: team.id,
         name: team.name,
