@@ -248,70 +248,70 @@ export const handler = async (
       };
     }
 
-    // get all team levels
-    const allTeamLevels = await TeamLevelOperations.getAllForTeam(
-      headers["team-id"] as UUID
-    );
-
-    console.log("INFO: All team levels:", allTeamLevels);
-
-    // check if photo from previous level is in database
-    const sortedTeamLevels = allTeamLevels.sort((a, b) =>
-      a.level_id.localeCompare(b.level_id)
-    );
-    const completedTeamLevels = sortedTeamLevels.filter(
-      (level) => level.completed_at !== undefined
-    );
-
-    console.log("INFO: Completed team levels:", completedTeamLevels);
-
-    // check if most recently completed level has a photo in the database
-    if (completedTeamLevels.length > 0) {
-      console.log(
-        "INFO: Checking for photos in most recently completed level:",
-        completedTeamLevels[completedTeamLevels.length - 1].level_id
-      );
-
-      const photos = await PhotoOperations.getByLevelId(
-        completedTeamLevels[completedTeamLevels.length - 1].level_id
-      );
-
-      console.log(
-        "INFO: Found " +
-          photos.length +
-          " photos for most recently completed level."
-      );
-
-      if (photos.length === 0) {
-        console.warn(
-          "WARN: No photos found for most recently completed level:",
-          completedTeamLevels[completedTeamLevels.length - 1].level_id
-        );
-
-        const messageHistory = await MessageOperations.getForUserAtLevel(
-          headers["user-id"] as UUID,
-          completedTeamLevels[completedTeamLevels.length - 1].level_id
-        );
-
-        const responseBody: LevelResponseBody = {
-          currentTeamLevel: currentTeamLevel.id as UUID,
-          messageHistory: messageHistory.slice(1), // omit first user message
-          requiresPhoto: true,
-          mapLink: null,
-        };
-
-        return {
-          statusCode: 200,
-          headers: corsHeaders,
-          body: JSON.stringify(responseBody),
-        };
-      }
-    }
-
     if (!eventBody.levelId) {
       console.log(
         "INFO: No levelId provided in request body, returning current level data."
       );
+
+      // get all team levels
+      const allTeamLevels = await TeamLevelOperations.getAllForTeam(
+        headers["team-id"] as UUID
+      );
+
+      console.log("INFO: All team levels:", allTeamLevels);
+
+      // check if photo from previous level is in database
+      const sortedTeamLevels = allTeamLevels.sort((a, b) =>
+        a.level_id.localeCompare(b.level_id)
+      );
+      const completedTeamLevels = sortedTeamLevels.filter(
+        (level) => level.completed_at !== undefined
+      );
+
+      console.log("INFO: Completed team levels:", completedTeamLevels);
+
+      // check if most recently completed level has a photo in the database
+      if (completedTeamLevels.length > 0) {
+        console.log(
+          "INFO: Checking for photos in most recently completed level:",
+          completedTeamLevels[completedTeamLevels.length - 1].level_id
+        );
+
+        const photos = await PhotoOperations.getByLevelId(
+          completedTeamLevels[completedTeamLevels.length - 1].level_id
+        );
+
+        console.log(
+          "INFO: Found " +
+            photos.length +
+            " photos for most recently completed level."
+        );
+
+        if (photos.length === 0) {
+          console.warn(
+            "WARN: No photos found for most recently completed level:",
+            completedTeamLevels[completedTeamLevels.length - 1].level_id
+          );
+
+          const messageHistory = await MessageOperations.getForUserAtLevel(
+            headers["user-id"] as UUID,
+            completedTeamLevels[completedTeamLevels.length - 1].level_id
+          );
+
+          const responseBody: LevelResponseBody = {
+            currentTeamLevel: currentTeamLevel.id as UUID,
+            messageHistory: messageHistory.slice(1), // omit first user message
+            requiresPhoto: true,
+            mapLink: null,
+          };
+
+          return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: JSON.stringify(responseBody),
+          };
+        }
+      }
 
       // cant use respondByLevelTime here because /level responds with LevelResponseBody
       return respondByLevelTimeLevelResponse({
@@ -420,43 +420,58 @@ export const handler = async (
           requiresPhoto: true,
         } as LevelResponseBody),
       };
-    } else if (
-      completedTeamLevels.some((level) => level.level_id === eventBody.levelId)
-    ) {
-      console.warn(
-        "WARN: Level ID already completed:",
-        eventBody.levelId,
-        "Completed levels:",
-        completedTeamLevels.map((level) => level.level_id)
-      );
-
-      // cant use respondByLevelTime here because /level responds with LevelResponseBody
-      return respondByLevelTimeLevelResponse({
-        gameId,
-        userId: headers["user-id"] as UUID,
-        teamId: headers["team-id"] as UUID,
-        messageHistory: userMessages,
-        currentTeamLevel,
-        currentLevel,
-      });
     } else {
-      console.warn(
-        "WARN: Wrong level ID provided:",
-        eventBody.levelId,
-        "Current level:",
-        currentLevel.id
+      // get all team levels for checking completed levels
+      const allTeamLevels = await TeamLevelOperations.getAllForTeam(
+        headers["team-id"] as UUID
+      );
+      const sortedTeamLevels = allTeamLevels.sort((a, b) =>
+        a.level_id.localeCompare(b.level_id)
+      );
+      const completedTeamLevels = sortedTeamLevels.filter(
+        (level) => level.completed_at !== undefined
       );
 
-      return {
-        statusCode: 400,
-        headers: corsHeaders,
-        body: JSON.stringify({
-          error: "Wrong level ID provided",
-          displayMessage:
-            "You are at the wrong location. Try to find a location that better matches the clues. Scan another duck to continue.",
-          details: `Received wrong level id: ${eventBody.levelId}`,
-        } as ResponseError),
-      };
+      if (
+        completedTeamLevels.some(
+          (level) => level.level_id === eventBody.levelId
+        )
+      ) {
+        console.warn(
+          "WARN: Level ID already completed:",
+          eventBody.levelId,
+          "Completed levels:",
+          completedTeamLevels.map((level) => level.level_id)
+        );
+
+        // cant use respondByLevelTime here because /level responds with LevelResponseBody
+        return respondByLevelTimeLevelResponse({
+          gameId,
+          userId: headers["user-id"] as UUID,
+          teamId: headers["team-id"] as UUID,
+          messageHistory: userMessages,
+          currentTeamLevel,
+          currentLevel,
+        });
+      } else {
+        console.warn(
+          "WARN: Wrong level ID provided:",
+          eventBody.levelId,
+          "Current level:",
+          currentLevel.id
+        );
+
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            error: "Wrong level ID provided",
+            displayMessage:
+              "You are at the wrong location. Try to find a location that better matches the clues. Scan another duck to continue.",
+            details: `Received wrong level id: ${eventBody.levelId}`,
+          } as ResponseError),
+        };
+      }
     }
   } catch (error) {
     console.error("ERROR: Failed to process request:", error);
