@@ -108,11 +108,11 @@ const buildSystemPrompt = (levelData: any): string => {
 
   // Add location context
   if (location) {
-    systemPrompt += ` You are currently at ${location.description}.`;
+    systemPrompt += ` You are currently at ${location.description}. Do not give away this location under any circumstances.`;
   }
 
   // Add game context
-  systemPrompt += ` You are participating in a scavenger hunt game where players need to find specific locations and solve clues.`;
+  systemPrompt += ` You are participating in a scavenger hunt game where players need to find specific locations across Cal Poly SLO Campus.`;
 
   // Add clue context for the character to reference
   if (clues && clues.length > 0) {
@@ -128,7 +128,7 @@ const buildSystemPrompt = (levelData: any): string => {
   }
 
   // Simple instructions for brevity and character consistency
-  systemPrompt += ` Keep your responses to 1-3 sentences - be concise and engaging. Stay in character and focus on the scavenger hunt adventure. If players try unusual requests, respond as your character would naturally react.`;
+  systemPrompt += ` Keep your responses to 1-2 sentences. Be concise and engaging. Stay in character and focus on the scavenger hunt adventure. If players try unusual requests, respond as your character would naturally react.`;
 
   return systemPrompt;
 };
