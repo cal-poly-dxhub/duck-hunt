@@ -18,6 +18,21 @@ export class ApiResources extends Construct {
     // reference stack if needed
     const stack = cdk.Stack.of(this);
 
+    // define the role for API Gateway logs
+    const apiGatewayLogsRole = new cdk.aws_iam.Role(this, "ApiGatewayLogsRole", {
+      assumedBy: new cdk.aws_iam.ServicePrincipal("apigateway.amazonaws.com"),
+      managedPolicies: [
+        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
+          "service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+        ),
+      ],
+    });
+
+    // connect the role to API Gateway at the account level
+    new cdk.aws_apigateway.CfnAccount(this, "ApiGatewayAccount", {
+      cloudWatchRoleArn: apiGatewayLogsRole.roleArn,
+    });
+
     // api
     this.api = new cdk.aws_apigateway.RestApi(this, "PublicApi", {
       description: "API for frontend public requests",
