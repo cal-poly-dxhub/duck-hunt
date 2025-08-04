@@ -222,5 +222,21 @@ export class FrontendResources extends Construct {
 
     // trigger build once it is ready
     triggerBuild.node.addDependency(build);
+
+    // allow CloudFront to read from the S3 bucket
+    siteBucket.addToResourcePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["s3:GetObject"],
+        resources: [siteBucket.arnForObjects("*")],
+        principals: [
+          new cdk.aws_iam.ServicePrincipal("cloudfront.amazonaws.com"),
+        ],
+        conditions: {
+          StringEquals: {
+            "AWS:SourceArn": `arn:aws:cloudfront::${cdk.Aws.ACCOUNT_ID}:distribution/${this.distribution.distributionId}`,
+          },
+        },
+      })
+    );
   }
 }
