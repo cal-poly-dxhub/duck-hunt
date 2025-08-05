@@ -399,7 +399,7 @@ class GameCreationService {
     console.log("TEAM URLS:");
     teams.forEach((team) => {
       console.log(
-        `team ${team.name} url: ${process.env.FRONTEND_CLOUDFRONT_URL}?team-id=${team.id}`
+        `team ${team.name} url: https://${process.env.FRONTEND_CLOUDFRONT_URL}?team-id=${team.id}`
       );
     });
 
@@ -417,7 +417,7 @@ class GameCreationService {
     levels.forEach((level) => {
       const occurrences = levelOccurrences.get(level.id) || 0;
       console.log(
-        `level ${level.levelName} url: ${process.env.FRONTEND_CLOUDFRONT_URL}?level-id=${level.id} x${occurrences} occurrences`
+        `level ${level.levelName} url: https://${process.env.FRONTEND_CLOUDFRONT_URL}?level-id=${level.id} x${occurrences} occurrences`
       );
     });
 

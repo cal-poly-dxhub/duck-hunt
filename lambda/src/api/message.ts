@@ -121,6 +121,8 @@ export const handler = async (
     });
   } catch (error) {
     console.error("ERROR: Failed to process request:", error);
+    console.error("ERROR: Error type:", typeof error);
+    console.error("ERROR: Error constructor:", error?.constructor?.name);
     return {
       statusCode: 500,
       headers: corsHeaders,

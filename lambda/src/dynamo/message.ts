@@ -121,17 +121,17 @@ export class MessageOperations {
     userId: string,
     levelId: string
   ): Promise<SharedMessage[]> {
-    const sortKeyPrefix = "MESSAGE#";
+    const userMessagePrefix = `USER#\${userId}#MESSAGE#`;
     const result = await docClient.send(
       new QueryCommand({
         TableName: DUCK_HUNT_TABLE_NAME,
         IndexName: "GSI3",
-        KeyConditionExpression: "GSI3PK = :gsi3pk AND begins_with(GSI3SK, :sk)",
-        FilterExpression: "PK = :pk AND attribute_not_exists(deleted_at)",
+        KeyConditionExpression:
+          "GSI3PK = :gsi3pk AND begins_with(GSI3SK, :userMessagePrefix)",
+        FilterExpression: "attribute_not_exists(deleted_at)",
         ExpressionAttributeValues: {
-          ":gsi3pk": `LEVEL#${levelId}`,
-          ":sk": sortKeyPrefix,
-          ":pk": `USER#${userId}`,
+          ":gsi3pk": `LEVEL#\${levelId}`,
+          ":userMessagePrefix": userMessagePrefix,
         },
       })
     );
@@ -176,7 +176,7 @@ export class MessageOperations {
           ":levelId": levelId,
         },
         Limit: 1,
-        ScanIndexForward: true, // oldest first
+        ScanIndexForward: true,
       })
     );
 

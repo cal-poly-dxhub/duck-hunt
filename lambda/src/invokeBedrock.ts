@@ -12,7 +12,8 @@ const bedrockClient = new BedrockRuntimeClient({
   region: process.env.AWS_REGION || "us-west-2",
 });
 
-const MODEL_ID = "anthropic.claude-3-5-haiku-20241022-v1:0";
+const MODEL_ID_1 = "anthropic.claude-3-5-haiku-20241022-v1:0";
+const MODEL_ID_2 = "anthropic.claude-3-haiku-20240307-v1:0";
 
 // Guardrail configuration
 const GUARDRAIL_ID = process.env.GUARDRAIL_ID || "qi5egvtmehhe";
@@ -134,7 +135,105 @@ const buildSystemPrompt = (levelData: any): string => {
 };
 
 /**
- * Invoke bedrock with message history and system prompt from s3
+ * Process Bedrock response and apply guardrails
+ */
+const processBedrockResponse = async (
+  response: any,
+  messageId: UUID
+): Promise<Message<MessageRole.Assistant>> => {
+  if (!response.body) {
+    throw new Error("No response body from Bedrock");
+  }
+
+  const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+
+  if (!responseBody.content?.[0]?.text) {
+    throw new Error("Invalid response format from Bedrock");
+  }
+
+  let responseMessage: Message<MessageRole.Assistant> = {
+    id: messageId,
+    role: MessageRole.Assistant,
+    content: responseBody.content[0].text,
+    createdAt: new Date(),
+  };
+
+  // Apply guardrails to the LLM response
+  const guardrailCheck = await applyGuardrails(
+    responseMessage.content,
+    "OUTPUT"
+  );
+
+  if (guardrailCheck.isBlocked) {
+    console.log(
+      `INFO: LLM response blocked by guardrails:`,
+      guardrailCheck.reason
+    );
+
+    responseMessage.content =
+      "I'm sorry, but I can't provide that response. Let me help you with your scavenger hunt in a different way.";
+  } else if (
+    guardrailCheck.filteredContent &&
+    guardrailCheck.filteredContent !== responseMessage.content
+  ) {
+    responseMessage.content = guardrailCheck.filteredContent;
+    console.log(`INFO: LLM response content filtered by guardrails`);
+  }
+
+  return responseMessage;
+};
+
+/**
+ * Get a clue from DynamoDB as fallback
+ */
+const getClueFromDynamo = async (
+  levelData: any,
+  messageId: UUID
+): Promise<Message<MessageRole.Assistant> | null> => {
+  try {
+    // Try to get an easy clue first, then regular clues
+    const availableClues = [
+      ...(levelData.easyClues || []),
+      ...(levelData.clues || []),
+    ];
+
+    if (availableClues.length === 0) {
+      return null;
+    }
+
+    // Pick a random clue
+    const randomClue =
+      availableClues[Math.floor(Math.random() * availableClues.length)];
+
+    // Include character context if available
+    const characterName = levelData.character?.name || "Guide";
+    const clueMessage: Message<MessageRole.Assistant> = {
+      id: messageId,
+      role: MessageRole.Assistant,
+      content: `*${characterName} offers a helpful hint* ${randomClue}`,
+      createdAt: new Date(),
+    };
+
+    // Apply guardrails to the clue as well
+    const guardrailCheck = await applyGuardrails(clueMessage.content, "OUTPUT");
+
+    if (guardrailCheck.isBlocked) {
+      return null; // Don't return blocked clues
+    }
+
+    if (guardrailCheck.filteredContent) {
+      clueMessage.content = guardrailCheck.filteredContent;
+    }
+
+    return clueMessage;
+  } catch (error) {
+    console.error("Error getting clue from DynamoDB:", error);
+    return null;
+  }
+};
+
+/**
+ * Invoke bedrock with proper fallback chain
  */
 const invokeBedrock = async ({
   levelId,
@@ -146,7 +245,6 @@ const invokeBedrock = async ({
     const levelData = await LevelOperations.getByLevelId(levelId);
 
     if (!levelData) {
-      // TODO: Return a clue from dynamo if level not found
       throw new Error(`Level not found for ID: ${levelId}`);
     }
 
@@ -166,98 +264,106 @@ const invokeBedrock = async ({
       temperature: 0.7,
     };
 
-    const command = new InvokeModelCommand({
-      modelId: MODEL_ID,
-      body: JSON.stringify(requestBody),
-      contentType: "application/json",
-      accept: "application/json",
-    });
-
-    const response = await bedrockClient.send(command);
-
-    if (!response.body) {
-      throw new Error("No response body from Bedrock");
-    }
-
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-
-    if (
-      !responseBody.content ||
-      !responseBody.content[0] ||
-      !responseBody.content[0].text
-    ) {
-      throw new Error("Invalid response format from Bedrock");
-    }
-
-    const responseMessage: Message<MessageRole.Assistant> = {
-      id: nextMessageId,
-      role: MessageRole.Assistant,
-      content: responseBody.content[0].text,
-      createdAt: new Date(),
-    };
-
-    console.log(
-      `INFO: Successfully invoked Bedrock for level ${levelId} with character: ${levelData.character.name}`
-    );
-
-    // Apply guardrails to the LLM response
-    const guardrailCheck = await applyGuardrails(
-      responseMessage.content,
-      "OUTPUT"
-    );
-
-    if (guardrailCheck.isBlocked) {
+    // Try primary model first
+    try {
       console.log(
-        `INFO: LLM response blocked by guardrails for level ${levelId}:`,
-        guardrailCheck.reason
+        `INFO: Invoking Bedrock with primary model ${MODEL_ID_1} for level ${levelId}`
       );
 
-      // Return a safe fallback message
-      const safeResponseMessage: Message<MessageRole.Assistant> = {
-        id: nextMessageId,
-        role: MessageRole.Assistant,
-        content:
-          "I'm sorry, but I can't provide that response. Let me help you with your scavenger hunt in a different way.",
-        createdAt: new Date(),
-      };
+      const command = new InvokeModelCommand({
+        modelId: MODEL_ID_1,
+        body: JSON.stringify(requestBody),
+        contentType: "application/json",
+        accept: "application/json",
+      });
 
-      return {
-        bedrockResponseMessage: safeResponseMessage,
-      };
-    }
-
-    // Use filtered content if available
-    if (
-      guardrailCheck.filteredContent &&
-      guardrailCheck.filteredContent !== responseMessage.content
-    ) {
-      responseMessage.content = guardrailCheck.filteredContent;
-      console.log(
-        `INFO: LLM response content filtered by guardrails for level ${levelId}`
+      const response = await bedrockClient.send(command);
+      const responseMessage = await processBedrockResponse(
+        response,
+        nextMessageId
       );
-    }
 
-    return {
-      bedrockResponseMessage: responseMessage,
-    };
+      console.log(
+        `INFO: Successfully invoked primary model for level ${levelId}`
+      );
+      return { bedrockResponseMessage: responseMessage };
+    } catch (primaryError) {
+      console.warn(
+        `WARN: Primary model ${MODEL_ID_1} failed for level ${levelId}:`,
+        primaryError
+      );
+
+      // Try fallback model
+      try {
+        console.log(
+          `INFO: Falling back to secondary model ${MODEL_ID_2} for level ${levelId}`
+        );
+
+        const fallbackCommand = new InvokeModelCommand({
+          modelId: MODEL_ID_2,
+          body: JSON.stringify(requestBody),
+          contentType: "application/json",
+          accept: "application/json",
+        });
+
+        const fallbackResponse = await bedrockClient.send(fallbackCommand);
+        const responseMessage = await processBedrockResponse(
+          fallbackResponse,
+          nextMessageId
+        );
+
+        console.log(
+          `INFO: Successfully invoked fallback model for level ${levelId}`
+        );
+        return { bedrockResponseMessage: responseMessage };
+      } catch (fallbackError) {
+        console.warn(
+          `WARN: Fallback model ${MODEL_ID_2} also failed for level ${levelId}:`,
+          fallbackError
+        );
+
+        // Both models failed, try to get a clue from DynamoDB
+        try {
+          console.log(
+            `INFO: Both models failed, attempting to get clue from DynamoDB for level ${levelId}`
+          );
+
+          const clueMessage = await getClueFromDynamo(levelData, nextMessageId);
+          if (clueMessage) {
+            console.log(
+              `INFO: Successfully retrieved clue from DynamoDB for level ${levelId}`
+            );
+            return { bedrockResponseMessage: clueMessage };
+          }
+        } catch (clueError) {
+          console.error(
+            `ERROR: Failed to get clue from DynamoDB for level ${levelId}:`,
+            clueError
+          );
+        }
+
+        // All fallbacks failed, throw to trigger final error message
+        throw new Error(
+          `All Bedrock models and DynamoDB clue retrieval failed for level ${levelId}`
+        );
+      }
+    }
   } catch (error) {
     console.error(
-      `ERROR: Bedrock invocation failed for level ${levelId}:`,
+      `ERROR: All fallback mechanisms failed for level ${levelId}:`,
       error
     );
 
-    // TODO: If dynamo error, return hardcoded response
-    const fallbackMessage: Message<MessageRole.Assistant> = {
+    // Final fallback - hardcoded error message
+    const errorMessage: Message<MessageRole.Assistant> = {
       id: nextMessageId,
       role: MessageRole.Assistant,
       content:
-        "I'm experiencing technical difficulties right now. Please try again in a moment.",
+        "I'm experiencing some technical difficulties right now. Please try again in a moment.",
       createdAt: new Date(),
     };
 
-    return {
-      bedrockResponseMessage: fallbackMessage,
-    };
+    return { bedrockResponseMessage: errorMessage };
   }
 };
 
@@ -268,6 +374,8 @@ export const invokeBedrockPersistToDynamo = async ({
   teamId,
   newUserMessage,
 }: InvokeBedrockPersistToDynamoProps): Promise<InvokeBedrockResponse> => {
+  let assistantMessage: Message<MessageRole.Assistant>;
+
   try {
     // Apply guardrails to user input first
     const userInputGuardrailCheck = await applyGuardrails(
@@ -275,110 +383,109 @@ export const invokeBedrockPersistToDynamo = async ({
       "INPUT"
     );
 
+    let processedUserMessage = { ...newUserMessage };
+    let shouldSaveUserMessage = true;
+
     if (userInputGuardrailCheck.isBlocked) {
       console.log(
         `INFO: User message blocked by guardrails for level ${levelId}:`,
         userInputGuardrailCheck.reason
       );
 
-      // Return a response indicating the message was blocked
-      const blockedResponseMessage: Message<MessageRole.Assistant> = {
+      // Create blocked response but still save the original user message
+      assistantMessage = {
         id: v4() as UUID,
         role: MessageRole.Assistant,
         content:
           "I can't process that message due to content policies. Please rephrase your question or comment, and I'll be happy to help with your scavenger hunt!",
         createdAt: new Date(),
       };
+    } else {
+      // Use filtered content if available
+      if (
+        userInputGuardrailCheck.filteredContent &&
+        userInputGuardrailCheck.filteredContent !== newUserMessage.content
+      ) {
+        processedUserMessage.content = userInputGuardrailCheck.filteredContent;
+        console.log(
+          `INFO: User message content filtered by guardrails for level ${levelId}`
+        );
+      }
 
-      return {
-        bedrockResponseMessage: blockedResponseMessage,
-      };
+      // Get existing message history from DynamoDB
+      let messageHistory: Array<Message> = [];
+
+      try {
+        messageHistory = await MessageOperations.getForUserAtLevel(
+          userId,
+          levelId
+        );
+      } catch (error) {
+        console.warn(
+          `Could not retrieve message history for level ${levelId}:`,
+          error
+        );
+        // Continue with empty message history
+      }
+
+      // Add the processed user message to history for LLM
+      messageHistory.push(processedUserMessage);
+
+      // Invoke Bedrock with the message history (including filtered user message)
+      const { bedrockResponseMessage } = await invokeBedrock({
+        levelId,
+        messageHistory,
+      });
+
+      assistantMessage = bedrockResponseMessage;
     }
 
-    // Use filtered content if available
-    let processedUserMessage = { ...newUserMessage };
-    if (
-      userInputGuardrailCheck.filteredContent &&
-      userInputGuardrailCheck.filteredContent !== newUserMessage.content
-    ) {
-      processedUserMessage.content = userInputGuardrailCheck.filteredContent;
-      console.log(
-        `INFO: User message content filtered by guardrails for level ${levelId}`
-      );
-    }
-
-    // Get existing message history from DynamoDB
-    let messageHistory: Array<Message> = [];
-
-    try {
-      messageHistory = await MessageOperations.getForUserAtLevel(
-        userId,
-        levelId
-      );
-    } catch (error) {
-      console.warn(
-        `Could not retrieve message history for level ${levelId}:`,
-        error
-      );
-      // Continue with empty message history
-    }
-
-    // Persist new user message to DynamoDB (use original content for storage)
+    // ALWAYS save user message to DynamoDB (original content)
     try {
       await MessageOperations.create({
         game_id: gameId,
         user_id: userId,
         team_id: teamId,
         level_id: levelId,
-        content: newUserMessage.content, // Store original user content
+        content: newUserMessage.content, // Always store original user content
         role: newUserMessage.role,
       });
-      messageHistory.push(processedUserMessage); // Use filtered content for LLM
-
       console.log(`INFO: Persisted user message for level ${levelId}`);
     } catch (error) {
       console.error(
         `ERROR: Failed to persist user message for level ${levelId}:`,
         error
       );
-      // Continue anyway - we'll still try to get a response from Bedrock
+      // Continue - we still want to save the assistant message and return response
     }
 
-    // Invoke Bedrock with the message history (including filtered user message)
-    const { bedrockResponseMessage } = await invokeBedrock({
-      levelId,
-      messageHistory,
-    });
-
-    // Persist Bedrock's response message to DynamoDB (regardless of whether it failed)
+    // ALWAYS save assistant message to DynamoDB
     try {
       await MessageOperations.create({
         game_id: gameId,
         user_id: userId,
         team_id: teamId,
         level_id: levelId,
-        content: bedrockResponseMessage.content,
-        role: bedrockResponseMessage.role,
+        content: assistantMessage.content,
+        role: assistantMessage.role,
       });
-      console.log(
-        `INFO: Persisted Bedrock response message for level ${levelId}`
-      );
+      console.log(`INFO: Persisted assistant message for level ${levelId}`);
     } catch (error) {
       console.error(
-        `ERROR: Failed to persist Bedrock response message for level ${levelId}:`,
+        `ERROR: Failed to persist assistant message for level ${levelId}:`,
         error
       );
-      // Don't fail the entire operation if we can't persist the response
+      // Don't fail the operation - we still return the response
     }
 
-    return { bedrockResponseMessage };
+    return { bedrockResponseMessage: assistantMessage };
   } catch (error) {
     console.error(
       `ERROR: invokeBedrockPersistToDynamo failed for level ${levelId}:`,
       error
     );
 
-    // Return a hardcoded fallback response
+    // Create final fallback response
     const fallbackMessage: Message<MessageRole.Assistant> = {
       id: v4() as UUID,
       role: MessageRole.Assistant,
@@ -387,8 +494,46 @@ export const invokeBedrockPersistToDynamo = async ({
       createdAt: new Date(),
     };
 
-    return {
-      bedrockResponseMessage: fallbackMessage,
-    };
+    // ALWAYS try to save user message even in error case
+    try {
+      await MessageOperations.create({
+        game_id: gameId,
+        user_id: userId,
+        team_id: teamId,
+        level_id: levelId,
+        content: newUserMessage.content,
+        role: newUserMessage.role,
+      });
+      console.log(
+        `INFO: Persisted user message in error case for level ${levelId}`
+      );
+    } catch (saveError) {
+      console.error(
+        `ERROR: Failed to persist user message in error case for level ${levelId}:`,
+        saveError
+      );
+    }
+
+    // ALWAYS try to save assistant message even in error case
+    try {
+      await MessageOperations.create({
+        game_id: gameId,
+        user_id: userId,
+        team_id: teamId,
+        level_id: levelId,
+        content: fallbackMessage.content,
+        role: fallbackMessage.role,
+      });
+      console.log(
+        `INFO: Persisted fallback assistant message for level ${levelId}`
+      );
+    } catch (saveError) {
+      console.error(
+        `ERROR: Failed to persist fallback assistant message for level ${levelId}:`,
+        saveError
+      );
+    }
+
+    return { bedrockResponseMessage: fallbackMessage };
   }
 };
