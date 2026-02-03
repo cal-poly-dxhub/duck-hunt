@@ -21,7 +21,7 @@ export class DuckHuntStack extends cdk.Stack {
       "DatastoreResources",
       {
         uniqueId,
-      }
+      },
     );
 
     // ------------ public api resources ------------
@@ -49,16 +49,16 @@ export class DuckHuntStack extends cdk.Stack {
     });
 
     // ------------ outputs ------------
-    new cdk.CfnOutput(this, "PublicApiUrl", {
-      value: apiResources.api.url,
-      description: "The URL of the public API",
-      exportName: `PublicApiUrl-${uniqueId}`,
-    });
-
     new cdk.CfnOutput(this, "FrontendDistributionDomain", {
       value: frontendResources.distribution.distributionDomainName,
       description: "The domain name of the frontend distribution",
       exportName: `FrontendDistributionDomainUrl-${uniqueId}`,
+    });
+
+    new cdk.CfnOutput(this, "GameConfigBucketName", {
+      value: gameResources.gameConfigBucket.bucketName,
+      description: "The name of the game config bucket",
+      exportName: `GameConfigBucketName-${uniqueId}`,
     });
   }
 }
