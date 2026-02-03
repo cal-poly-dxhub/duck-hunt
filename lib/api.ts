@@ -51,6 +51,7 @@ export class ApiResources extends Construct {
       bundling: {
         externalModules: ["@aws-sdk/*"],
         nodeModules: [],
+        forceDockerBundling: false,
       },
       timeout: cdk.Duration.seconds(30),
       environment: {
@@ -67,10 +68,10 @@ export class ApiResources extends Construct {
       new cdk.aws_iam.PolicyStatement({
         actions: ["bedrock:InvokeModel", "bedrock:ApplyGuardrail"],
         resources: ["*"],
-      })
+      }),
     );
     const messageLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
-      messageLambda
+      messageLambda,
     );
     messageResource.addMethod("POST", messageLambdaIntegration);
 
@@ -83,6 +84,7 @@ export class ApiResources extends Construct {
       bundling: {
         externalModules: ["@aws-sdk/*"],
         nodeModules: [],
+        forceDockerBundling: false,
       },
       timeout: cdk.Duration.seconds(30),
       environment: {
@@ -99,10 +101,10 @@ export class ApiResources extends Construct {
       new cdk.aws_iam.PolicyStatement({
         actions: ["bedrock:InvokeModel", "bedrock:ApplyGuardrail"],
         resources: ["*"],
-      })
+      }),
     );
     const levelLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
-      levelLambda
+      levelLambda,
     );
     levelResource.addMethod("POST", levelLambdaIntegration);
 
@@ -115,6 +117,7 @@ export class ApiResources extends Construct {
       bundling: {
         externalModules: ["@aws-sdk/*"],
         nodeModules: [],
+        forceDockerBundling: false,
       },
       timeout: cdk.Duration.seconds(30),
       environment: {
@@ -131,10 +134,10 @@ export class ApiResources extends Construct {
       new cdk.aws_iam.PolicyStatement({
         actions: ["bedrock:InvokeModel", "bedrock:ApplyGuardrail"],
         resources: ["*"],
-      })
+      }),
     );
     const clearChatLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
-      clearChatLambda
+      clearChatLambda,
     );
     clearChatResource.addMethod("POST", clearChatLambdaIntegration);
 
@@ -150,6 +153,7 @@ export class ApiResources extends Construct {
         bundling: {
           externalModules: ["@aws-sdk/*"],
           nodeModules: [],
+          forceDockerBundling: false,
         },
         environment: {
           DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
@@ -159,7 +163,7 @@ export class ApiResources extends Construct {
           retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
           removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
         }),
-      }
+      },
     );
     props.duckHuntTable.grantReadWriteData(pingCoordinatesLambda);
     const pingCoordinatesLambdaIntegration =
@@ -174,6 +178,7 @@ export class ApiResources extends Construct {
       bundling: {
         externalModules: ["@aws-sdk/*"],
         nodeModules: [],
+        forceDockerBundling: false,
       },
       timeout: cdk.Duration.seconds(30),
       environment: {

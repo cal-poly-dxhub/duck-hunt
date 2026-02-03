@@ -10,6 +10,7 @@ cdk.out
 
 cdk.context.json
 
+.env
 deploy.sh
 dist
 *.zip

@@ -74,45 +74,15 @@ export class FrontendResources extends Construct {
       }
     );
 
-    // bucket for frontend source zip
-    const sourceBucket = new cdk.aws_s3.Bucket(
-      this,
-      `FrontendSourceBucket-${props.uniqueId}`,
-      {
-        removalPolicy: props.removalPolicy ?? cdk.RemovalPolicy.DESTROY,
-        autoDeleteObjects: true,
-        blockPublicAccess: cdk.aws_s3.BlockPublicAccess.BLOCK_ALL,
-      }
-    );
-
-    // upload frontend source zip to S3 bucket
-    const sourceDeployment = new cdk.aws_s3_deployment.BucketDeployment(
-      this,
-      `FrontendSourceDeployment-${props.uniqueId}`,
-      {
-        sources: [cdk.aws_s3_deployment.Source.asset("./frontend.zip")],
-        destinationBucket: sourceBucket,
-        extract: false, // we upload a zip file, no need to extract
-        logGroup: new cdk.aws_logs.LogGroup(
-          this,
-          `FrontendSourceDeploymentLogGroup-${props.uniqueId}`,
-          {
-            removalPolicy: cdk.RemovalPolicy.DESTROY,
-            retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
-          }
-        ),
-      }
-    );
-
-    // codebuild project to build frontend
+    // codebuild project to build frontend from GitHub
     const build = new cdk.aws_codebuild.Project(
       this,
       `FrontendBuild-${props.uniqueId}`,
       {
-        // TODO: source should be github later
-        source: cdk.aws_codebuild.Source.s3({
-          bucket: sourceBucket,
-          path: cdk.Fn.select(0, sourceDeployment.objectKeys),
+        source: cdk.aws_codebuild.Source.gitHub({
+          owner: "cal-poly-dxhub",
+          repo: "duck-hunt",
+          branchOrRef: "main",
         }),
         environment: {
           // TODO: try without privilege?
@@ -143,11 +113,11 @@ export class FrontendResources extends Construct {
               commands: [
                 "cd frontend",
                 "echo installing dependencies...",
-                "yarn install",
+                "npm install",
               ],
             },
             build: {
-              commands: ["echo building...", "yarn build"],
+              commands: ["echo building...", "npm run build"],
             },
           },
           artifacts: {
@@ -176,10 +146,8 @@ export class FrontendResources extends Construct {
 
     // needs s3 access
     siteBucket.grantWrite(build);
-    sourceBucket.grantRead(build);
 
-    // ensure the build runs after the source deployment and all env vars are ready
-    build.node.addDependency(sourceDeployment);
+    // ensure the build runs after all env vars are ready
     build.node.addDependency(this.distribution);
     build.node.addDependency(props.api);
 

@@ -29,7 +29,7 @@ export class GameResources extends Construct {
             allowedHeaders: ["*"],
           },
         ],
-      }
+      },
     );
 
     // lambda to create game from game config
@@ -40,6 +40,9 @@ export class GameResources extends Construct {
         runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
         entry: "./lambda/src/createGame.ts",
         timeout: cdk.Duration.seconds(30),
+        bundling: {
+          forceDockerBundling: false,
+        },
         environment: {
           DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
           GAME_CONFIG_BUCKET_NAME: this.gameConfigBucket.bucketName,
@@ -50,7 +53,7 @@ export class GameResources extends Construct {
           retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
           removalPolicy: props.removalPolicy || cdk.RemovalPolicy.DESTROY,
         }),
-      }
+      },
     );
 
     // Grant permissions
@@ -59,12 +62,12 @@ export class GameResources extends Construct {
 
     // s3 trigger for lambda
     const s3Trigger = new cdk.aws_s3_notifications.LambdaDestination(
-      createGameLambda
+      createGameLambda,
     );
 
     this.gameConfigBucket.addEventNotification(
       cdk.aws_s3.EventType.OBJECT_CREATED,
-      s3Trigger
+      s3Trigger,
     );
   }
 }
