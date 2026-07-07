@@ -1,3 +1,4 @@
+import { levelTimeConfig } from "@shared/config";
 import {
   corsHeaders,
   MessageResponseBody,
@@ -64,11 +65,13 @@ export const respondByLevelTime = async ({
 
   console.log("INFO: Minutes on level:", minutesOnLevel);
 
-  if (minutesOnLevel < 10) {
+  if (minutesOnLevel < levelTimeConfig.easyClueThresholdMin) {
     if (!firstTeamMessageForCurrentLevel) {
       console.warn("WARN: No messages found for team at current level.");
     } else {
-      console.log("INFO: User has been on the level for less than 10 minutes.");
+      console.log(
+        `INFO: User has been on the level for less than ${levelTimeConfig.easyClueThresholdMin} minutes.`
+      );
     }
 
     // been on level for <10 minutes
@@ -93,9 +96,12 @@ export const respondByLevelTime = async ({
         mapLink: null,
       } as MessageResponseBody),
     };
-  } else if (minutesOnLevel > 10 && minutesOnLevel <= 15) {
+  } else if (
+    minutesOnLevel > levelTimeConfig.easyClueThresholdMin &&
+    minutesOnLevel <= levelTimeConfig.mapLinkThresholdMin
+  ) {
     console.warn(
-      "WARN: User has been on the level for more than 10 minutes (<15 minutes)."
+      `WARN: User has been on the level for more than ${levelTimeConfig.easyClueThresholdMin} minutes (<${levelTimeConfig.mapLinkThresholdMin} minutes).`
     );
 
     // Pick a random easy clue from currentLevel.easyClues
@@ -116,8 +122,10 @@ export const respondByLevelTime = async ({
       } as MessageResponseBody),
     };
   } else {
-    // been on level for >15 minutes
-    console.warn("WARN: User has been on the level for more than 15 minutes.");
+    // been on level for > mapLinkThresholdMin minutes
+    console.warn(
+      `WARN: User has been on the level for more than ${levelTimeConfig.mapLinkThresholdMin} minutes.`
+    );
 
     return {
       statusCode: 200,

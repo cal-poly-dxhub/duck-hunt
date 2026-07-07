@@ -1,5 +1,8 @@
 import * as cdk from "aws-cdk-lib";
+import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import { Construct } from "constructs";
+import * as fs from "fs";
+import * as path from "path";
 
 export interface FrontendResourcesProps {
   uniqueId: string;
@@ -8,11 +11,26 @@ export interface FrontendResourcesProps {
   photoBucket: cdk.aws_s3.Bucket;
 }
 
+// Path to the statically-exported Next.js frontend (produced by
+// `yarn build` in frontend/, i.e. `next build` with output: "export").
+const FRONTEND_OUT_DIR = path.join(__dirname, "..", "frontend", "out");
+
 export class FrontendResources extends Construct {
   public readonly distribution: cdk.aws_cloudfront.Distribution;
 
   constructor(scope: Construct, id: string, props: FrontendResourcesProps) {
     super(scope, id);
+
+    // Fail early with a clear message if the frontend hasn't been built yet.
+    // The deploy script (scripts/deploy.sh) runs the frontend build before
+    // `cdk deploy`; if you run cdk directly, build it first.
+    if (!fs.existsSync(path.join(FRONTEND_OUT_DIR, "index.html"))) {
+      throw new Error(
+        `Frontend build not found at ${FRONTEND_OUT_DIR}. ` +
+          `Run \`yarn --cwd frontend install && yarn --cwd frontend build\` first ` +
+          `(or use scripts/deploy.sh, which does this automatically).`
+      );
+    }
 
     // s3 bucket for static assets
     const siteBucket = new cdk.aws_s3.Bucket(
@@ -74,121 +92,29 @@ export class FrontendResources extends Construct {
       }
     );
 
-    // codebuild project to build frontend from GitHub
-    const build = new cdk.aws_codebuild.Project(
-      this,
-      `FrontendBuild-${props.uniqueId}`,
-      {
-        source: cdk.aws_codebuild.Source.gitHub({
-          owner: "cal-poly-dxhub",
-          repo: "duck-hunt",
-          branchOrRef: "main",
-        }),
-        environment: {
-          // TODO: try without privilege?
-          privileged: true,
-        },
-        artifacts: cdk.aws_codebuild.Artifacts.s3({
-          bucket: siteBucket,
-          includeBuildId: false,
-          packageZip: false,
-          name: "/",
-          encryption: false,
-        }),
-        environmentVariables: {
-          NEXT_PUBLIC_AWS_REGION: {
-            value: cdk.Aws.REGION,
-          },
-          NEXT_PUBLIC_API_BASE_URL: {
-            value: props.api.url + "api",
-          },
-        },
-        buildSpec: cdk.aws_codebuild.BuildSpec.fromObject({
-          version: "0.2",
-          phases: {
-            install: {
-              "runtime-versions": {
-                nodejs: "22",
-              },
-              commands: [
-                "cd frontend",
-                "echo installing dependencies...",
-                "npm install",
-              ],
-            },
-            build: {
-              commands: ["echo building...", "npm run build"],
-            },
-          },
-          artifacts: {
-            "base-directory": "frontend/out",
-            "s3-artifact-acl": "bucket-owner-full-control",
-            files: ["**/*"],
-          },
-        }),
-        logging: {
-          cloudWatch: {
-            logGroup: new cdk.aws_logs.LogGroup(
-              this,
-              `FrontendBuildLogGroup-${props.uniqueId}`,
-              {
-                removalPolicy: props.removalPolicy ?? cdk.RemovalPolicy.DESTROY,
-                retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
-              }
-            ),
-          },
-        },
-      }
-    );
+    // Runtime env config. The API Gateway URL is only known at deploy time, so
+    // rather than baking it into the static build we ship a tiny env.js that
+    // sets window.__ENV__. BucketDeployment substitutes the resolved URL at
+    // deploy time (see frontend/src/api/env.ts for the consumer). The static
+    // export is loaded via <script src="/env.js"> in layout.tsx.
+    const apiBaseUrl = `${props.api.url}api`;
+    const envJs = `window.__ENV__ = ${JSON.stringify({
+      API_BASE_URL: apiBaseUrl,
+    })};`;
 
-    // when codebuild updates, allow invalidation of cloudfront cache
-    this.distribution.grant(build.role!, "cloudfront:CreateInvalidation");
-
-    // needs s3 access
-    siteBucket.grantWrite(build);
-
-    // ensure the build runs after all env vars are ready
-    build.node.addDependency(this.distribution);
-    build.node.addDependency(props.api);
-
-    // trigger codebuild project on stack creation and update
-    const triggerBuild = new cdk.custom_resources.AwsCustomResource(
-      this,
-      `TriggerCodeBuild-${props.uniqueId}`,
-      {
-        onCreate: {
-          outputPaths: ["BuildId"],
-          service: "CodeBuild",
-          action: "startBuild",
-          parameters: {
-            projectName: build.projectName,
-          },
-          physicalResourceId: cdk.custom_resources.PhysicalResourceId.of(
-            `trigger-codebuild-${Date.now()}`
-          ),
-        },
-        onUpdate: {
-          outputPaths: ["BuildId"],
-          service: "CodeBuild",
-          action: "startBuild",
-          parameters: {
-            projectName: build.projectName,
-          },
-          physicalResourceId: cdk.custom_resources.PhysicalResourceId.of(
-            `trigger-codebuild-${Date.now()}`
-          ),
-        },
-        policy: cdk.custom_resources.AwsCustomResourcePolicy.fromStatements([
-          new cdk.aws_iam.PolicyStatement({
-            effect: cdk.aws_iam.Effect.ALLOW,
-            actions: ["codebuild:StartBuild"],
-            resources: [build.projectArn],
-          }),
-        ]),
-      }
-    );
-
-    // trigger build once it is ready
-    triggerBuild.node.addDependency(build);
+    // Deploy the built frontend + env.js to the site bucket, then invalidate
+    // CloudFront. This replaces the previous CodeBuild-from-GitHub flow, so the
+    // deployed site reflects the local code and the deploy fails loudly if the
+    // upload fails.
+    new s3deploy.BucketDeployment(this, `FrontendDeployment-${props.uniqueId}`, {
+      sources: [
+        s3deploy.Source.asset(FRONTEND_OUT_DIR),
+        s3deploy.Source.data("env.js", envJs),
+      ],
+      destinationBucket: siteBucket,
+      distribution: this.distribution,
+      distributionPaths: ["/*"],
+      prune: true,
+    });
   }
 }

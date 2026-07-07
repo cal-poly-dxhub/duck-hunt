@@ -14,11 +14,39 @@ import {
   TextInput,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
+import { frontendConfig } from "@shared/config";
 import { Message, MessageRole, UUID } from "@shared/types";
 import { IconSend, IconTrash, IconUpload } from "@tabler/icons-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
 import { v4 } from "uuid";
+
+// Render markdown from the LLM (bold, italics, lists, links) while keeping the
+// retro-terminal look: monospace, green, and laid out inline so the prefix and
+// blinking cursor still sit on the same line as short replies.
+const markdownComponents: Components = {
+  p: ({ children }) => <span>{children}</span>,
+  ul: ({ children }) => (
+    <ul style={{ margin: "0.25rem 0", paddingLeft: "1.25rem" }}>{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol style={{ margin: "0.25rem 0", paddingLeft: "1.25rem" }}>{children}</ol>
+  ),
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ color: "var(--mantine-color-green-3)", textDecoration: "underline" }}
+    >
+      {children}
+    </a>
+  ),
+  code: ({ children }) => (
+    <code style={{ fontFamily: "monospace", opacity: 0.9 }}>{children}</code>
+  ),
+};
 
 const blinkAnimation = `
   @keyframes blink {
@@ -217,7 +245,7 @@ export default function Chat() {
   useEffect(() => {
     const interval = setInterval(() => {
       scavengerHuntApi.pingCoordinates();
-    }, 10000);
+    }, frontendConfig.coordinatePingIntervalMs);
 
     return () => clearInterval(interval);
   }, []);
@@ -320,10 +348,8 @@ export default function Chat() {
                 ? typingMessages[message.id]
                 : message.content;
 
-              const displayText =
-                message.role === MessageRole.Assistant
-                  ? "> " + displayContent
-                  : "$ " + displayContent;
+              const isAssistant = message.role === MessageRole.Assistant;
+              const prefix = isAssistant ? "> " : "$ ";
 
               const isLoadingMessage =
                 message.content === "Loading..." && loading;
@@ -374,8 +400,20 @@ export default function Chat() {
                         </span>
                       </span>
                     </span>
+                  ) : isAssistant ? (
+                    <>
+                      {prefix}
+                      <Box
+                        component="span"
+                        style={{ display: "inline" }}
+                      >
+                        <ReactMarkdown components={markdownComponents}>
+                          {displayContent}
+                        </ReactMarkdown>
+                      </Box>
+                    </>
                   ) : (
-                    displayText
+                    prefix + displayContent
                   )}
                   {message.role === MessageRole.Assistant &&
                     !isLoadingMessage &&

@@ -1,4 +1,10 @@
-import { PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
+import { modelRoulettePool } from "@shared/config";
 import { v4 as uuidv4 } from "uuid";
 import {
   BaseEntity,
@@ -12,6 +18,8 @@ export interface TeamLevel extends BaseEntity {
   level_id: string;
   index: number;
   completed_at?: string;
+  /** Model roulette: the model this team was locked to for THIS level. */
+  model?: string;
 }
 
 // TEAM_LEVEL Operations
@@ -129,6 +137,63 @@ export class TeamLevelOperations {
         },
       })
     );
+  }
+
+  /**
+   * Model roulette (per team, per level): return the model locked in for this
+   * team at this level, assigning a random one from the pool on the first
+   * call. Uses a conditional write so concurrent first requests from teammates
+   * can't split-assign — first writer wins, others read it. A team re-rolls a
+   * fresh model at each new level.
+   */
+  static async getOrAssignModel(
+    teamId: string,
+    levelId: string
+  ): Promise<string> {
+    const key = { PK: `TEAM#${teamId}`, SK: `LEVEL#${levelId}` };
+
+    // Fast path: already assigned for this level.
+    const existing = await docClient.send(
+      new GetCommand({ TableName: DUCK_HUNT_TABLE_NAME, Key: key })
+    );
+    if (existing.Item?.model) {
+      return existing.Item.model as string;
+    }
+
+    // Pick a random model and try to claim it atomically.
+    const candidate =
+      modelRoulettePool[Math.floor(Math.random() * modelRoulettePool.length)];
+
+    try {
+      await docClient.send(
+        new UpdateCommand({
+          TableName: DUCK_HUNT_TABLE_NAME,
+          Key: key,
+          UpdateExpression: "SET #model = :m, updated_at = :u",
+          ConditionExpression: "attribute_not_exists(#model)",
+          ExpressionAttributeNames: { "#model": "model" },
+          ExpressionAttributeValues: {
+            ":m": candidate,
+            ":u": getCurrentTimestamp(),
+          },
+        })
+      );
+      console.log(
+        `INFO: Assigned model ${candidate} to team ${teamId} at level ${levelId}`
+      );
+      return candidate;
+    } catch (error: any) {
+      // Lost the race: another request assigned first. Read the winner.
+      if (error?.name === "ConditionalCheckFailedException") {
+        const after = await docClient.send(
+          new GetCommand({ TableName: DUCK_HUNT_TABLE_NAME, Key: key })
+        );
+        if (after.Item?.model) {
+          return after.Item.model as string;
+        }
+      }
+      throw error;
+    }
   }
 
   static async getNextLevel(

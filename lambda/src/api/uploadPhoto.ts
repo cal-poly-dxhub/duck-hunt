@@ -1,4 +1,5 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { photoConfig } from "@shared/config";
 import { corsHeaders, RequestHeaders } from "@shared/types";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { PhotoOperations } from "src/dynamo/photo";
@@ -145,6 +146,8 @@ export const handler = async (
       );
     }
 
+    const photoUrl = photoConfig.buildPhotoUrl(photoBucket, filename);
+
     // Save photo metadata to DynamoDB
     console.log("INFO: Saving photo metadata to DynamoDB...");
     await PhotoOperations.create({
@@ -152,7 +155,7 @@ export const handler = async (
       team_id: currentTeamLevel.team_id,
       level_id: currentTeamLevel.level_id,
       user_id: headers["user-id"],
-      url: `https://${photoBucket}.s3.amazonaws.com/${filename}`,
+      url: photoUrl,
     });
 
     console.log("INFO: Photo metadata saved to DynamoDB");
@@ -165,7 +168,7 @@ export const handler = async (
         message: "Photo uploaded successfully",
         photo: {
           id: photoId,
-          url: `https://${photoBucket}.s3.amazonaws.com/${filename}`,
+          url: photoUrl,
           format: extension,
         },
       }),

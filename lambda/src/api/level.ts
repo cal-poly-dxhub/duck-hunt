@@ -1,3 +1,4 @@
+import { levelTimeConfig } from "@shared/config";
 import {
   corsHeaders,
   LevelResponseBody,
@@ -67,7 +68,7 @@ const respondByLevelTimeLevelResponse = async ({
   );
 
   console.log("INFO: Minutes on level:", minutesOnLevel);
-  if (minutesOnLevel < 10) {
+  if (minutesOnLevel < levelTimeConfig.easyClueThresholdMin) {
     if (!firstTeamMessageForCurrentLevel) {
       console.warn("WARN: No messages found for team at current level.");
     } else {
@@ -135,10 +136,13 @@ const respondByLevelTimeLevelResponse = async ({
       headers: corsHeaders,
       body: JSON.stringify(levelResponse),
     };
-  } else if (minutesOnLevel > 10 && minutesOnLevel <= 15) {
-    // been on level for >10 minutes, <15 minutes
+  } else if (
+    minutesOnLevel > levelTimeConfig.easyClueThresholdMin &&
+    minutesOnLevel <= levelTimeConfig.mapLinkThresholdMin
+  ) {
+    // been on level for > easyClueThresholdMin, <= mapLinkThresholdMin minutes
     console.warn(
-      "WARN: User has been on the level for more than 10 minutes (<15 minutes)."
+      `WARN: User has been on the level for more than ${levelTimeConfig.easyClueThresholdMin} minutes (<${levelTimeConfig.mapLinkThresholdMin} minutes).`
     );
 
     // Pick a random easy clue from currentLevel.easyClues
@@ -166,8 +170,10 @@ const respondByLevelTimeLevelResponse = async ({
       body: JSON.stringify(easyClueLevelResponse),
     };
   } else {
-    // been on level for >15 minutes
-    console.warn("WARN: User has been on the level for more than 15 minutes.");
+    // been on level for > mapLinkThresholdMin minutes
+    console.warn(
+      `WARN: User has been on the level for more than ${levelTimeConfig.mapLinkThresholdMin} minutes.`
+    );
 
     const hardMessage: Message<MessageRole.Assistant> = {
       id: v4() as UUID,
@@ -262,7 +268,7 @@ export const handler = async (
 
       // check if photo from previous level is in database
       const sortedTeamLevels = allTeamLevels.sort((a, b) =>
-        a.level_id.localeCompare(b.level_id)
+        (a.level_id ?? "").localeCompare(b.level_id ?? "")
       );
       const completedTeamLevels = sortedTeamLevels.filter(
         (level) => level.completed_at !== undefined
@@ -365,9 +371,11 @@ export const handler = async (
       }
 
       // otherwise, more levels to go
+      // NOTE: newCurrentLevel is a TeamLevel; use level_id (the real LEVEL id),
+      // not id (the join-row's own id), or the level lookup / Bedrock call fails.
       const newCurrentUserMessages = await MessageOperations.getForUserAtLevel(
         headers["user-id"] as UUID,
-        newCurrentLevel.id as UUID
+        newCurrentLevel.level_id as UUID
       );
 
       console.log(
@@ -405,7 +413,7 @@ export const handler = async (
 
       const { bedrockResponseMessage } = await invokeBedrockPersistToDynamo({
         gameId: gameId,
-        levelId: newCurrentLevel.id as UUID,
+        levelId: newCurrentLevel.level_id as UUID,
         userId: headers["user-id"] as UUID,
         teamId: headers["team-id"] as UUID,
         newUserMessage,
@@ -426,7 +434,7 @@ export const handler = async (
         headers["team-id"] as UUID
       );
       const sortedTeamLevels = allTeamLevels.sort((a, b) =>
-        a.level_id.localeCompare(b.level_id)
+        (a.level_id ?? "").localeCompare(b.level_id ?? "")
       );
       const completedTeamLevels = sortedTeamLevels.filter(
         (level) => level.completed_at !== undefined

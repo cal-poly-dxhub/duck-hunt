@@ -87,13 +87,13 @@ export const fetchBaseData = async (
   let currentUser = await UserOperations.getById(headers["user-id"] as UUID);
 
   if (!currentUser) {
-    UserOperations.create({
+    // Must await: a new user's first request previously failed because the
+    // create had not landed before the re-read below (worked on refresh).
+    currentUser = await UserOperations.create({
       id: headers["user-id"] as UUID,
       team_id: headers["team-id"] as UUID,
     });
   }
-
-  currentUser = await UserOperations.getById(headers["user-id"] as UUID);
 
   if (!currentUser) {
     console.error("ERROR: User not found for user-id:", headers["user-id"]);

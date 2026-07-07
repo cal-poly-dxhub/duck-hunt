@@ -421,6 +421,35 @@ class GameCreationService {
       );
     });
 
+    console.log("");
+
+    // Build a per-team ordered route (which locations that team visits, in order).
+    const levelNameById = new Map(levels.map((l) => [l.id, l.levelName]));
+    const routeByTeam = new Map<
+      string,
+      { index: number; levelName: string }[]
+    >();
+    teamLevelAssignments.forEach((a) => {
+      const route = routeByTeam.get(a.teamId) || [];
+      route.push({
+        index: a.index,
+        levelName: levelNameById.get(a.levelId) || a.levelId,
+      });
+      routeByTeam.set(a.teamId, route);
+    });
+    // Sort each team's route by visit order.
+    routeByTeam.forEach((route) => route.sort((x, y) => x.index - y.index));
+
+    // Log human-readable per-team routes.
+    console.log("TEAM ROUTES:");
+    teams.forEach((team) => {
+      const route = routeByTeam.get(team.id) || [];
+      console.log(`team ${team.name} route:`);
+      route.forEach((stop, i) => {
+        console.log(`  ${i + 1}. ${stop.levelName}`);
+      });
+    });
+
     // now create a json object of all the data and log it
 
     const gameData = {
@@ -429,6 +458,10 @@ class GameCreationService {
         id: team.id,
         name: team.name,
         url: `${process.env.FRONTEND_CLOUDFRONT_URL}?team-id=${team.id}`,
+        route: (routeByTeam.get(team.id) || []).map((stop, i) => ({
+          order: i + 1,
+          levelName: stop.levelName,
+        })),
       })),
       levels: levels.map((level) => ({
         id: level.id,
