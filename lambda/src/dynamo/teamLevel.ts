@@ -17,6 +17,8 @@ export interface TeamLevel extends BaseEntity {
   team_id: string;
   level_id: string;
   index: number;
+  /** ISO timestamp of when the team first arrived at / interacted with this level. */
+  started_at?: string;
   completed_at?: string;
 }
 
@@ -135,6 +137,49 @@ export class TeamLevelOperations {
         },
       })
     );
+  }
+
+  /**
+   * Record when a team first arrives at a level. Uses a conditional write so
+   * only the FIRST call sets started_at — later interactions leave the
+   * original arrival time untouched. Idempotent and safe to call on every
+   * request for the current level.
+   */
+  static async markLevelAsStarted(
+    teamId: string,
+    levelId: string
+  ): Promise<void> {
+    const currentTimestamp = getCurrentTimestamp();
+
+    try {
+      await docClient.send(
+        new UpdateCommand({
+          TableName: DUCK_HUNT_TABLE_NAME,
+          Key: {
+            PK: `TEAM#${teamId}`,
+            SK: `LEVEL#${levelId}`,
+          },
+          UpdateExpression:
+            "SET started_at = :startedAt, updated_at = :updatedAt",
+          ConditionExpression: "attribute_not_exists(started_at)",
+          ExpressionAttributeValues: {
+            ":startedAt": currentTimestamp,
+            ":updatedAt": currentTimestamp,
+          },
+        })
+      );
+      console.log(
+        `INFO: Marked level ${levelId} as started for team ${teamId} at ${currentTimestamp}`
+      );
+    } catch (error: any) {
+      // Already started — expected on every call after the first. Not an error.
+      if (error?.name !== "ConditionalCheckFailedException") {
+        console.error(
+          `ERROR: Failed to mark level ${levelId} started for team ${teamId}:`,
+          error
+        );
+      }
+    }
   }
 
   /**

@@ -84,6 +84,15 @@ export const fetchBaseData = async (
     };
   }
 
+  // Record arrival time at the current level (only sets it once — see
+  // markLevelAsStarted). Skip if already completed (re-scanning an old duck).
+  if (!currentTeamLevel.completed_at) {
+    await TeamLevelOperations.markLevelAsStarted(
+      headers["team-id"] as UUID,
+      currentTeamLevel.level_id as UUID
+    );
+  }
+
   let currentUser = await UserOperations.getById(headers["user-id"] as UUID);
 
   if (!currentUser) {
