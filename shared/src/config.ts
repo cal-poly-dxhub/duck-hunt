@@ -3,32 +3,30 @@
 export const bedrockConfig = {
   temperature: 0.7,
   defaultMaxTokens: 512,
-  // Used only if a team somehow has no assigned model and assignment fails.
-  fallbackModelId: "us.amazon.nova-2-lite-v1:0",
+  // Used if a level's position has no model mapping (e.g. more levels than
+  // entries in levelModels, or an out-of-range index).
+  fallbackModelId: "us.amazon.nova-lite-v1:0",
 } as const;
 
 /**
- * Model roulette pool. Each team is randomly assigned ONE of these on its
- * first Bedrock call, and keeps it for the rest of the game (see
- * TeamOperations.getOrAssignModel). Models are invoked via the Bedrock
- * Converse API, which normalizes requests/responses across providers, so the
- * pool can mix Anthropic, Meta, OpenAI-OSS, DeepSeek, Moonshot, Z.ai, etc.
+ * Fixed model per level POSITION, shared by all teams. Indexed by the team's
+ * route order (TEAM_LEVEL.index, 0-based): entry [0] is every team's 1st stop,
+ * entry [1] the 2nd, ... and the last entry is the shared final level.
  *
- * NOTE: these IDs must be exact Bedrock model / inference-profile IDs that are
- * enabled (and, for third-party models, marketplace-subscribed) in your
- * account and region, or InvokeModel/Converse will return an AccessDenied /
- * ValidationException for that team.
+ * The physical location at each position differs per team (routes are
+ * randomized), but the MODEL is the same for a given position across all teams.
+ *
+ * NOTE: these must be exact Bedrock model / inference-profile IDs enabled
+ * (and, for third-party models, marketplace-subscribed) in your account and
+ * region, or Converse returns AccessDenied / ValidationException.
  */
-export const modelRoulettePool: readonly string[] = [
-  "us.amazon.nova-2-lite-v1:0",
-  // "zai.glm-4.7",
-  // "mistral.mistral-large-3-675b-instruct",
-  "us.amazon.nova-micro-v1:0",
+export const levelModels: readonly string[] = [
+  "google.gemma-3-27b-it", // Level 1
+  "meta.llama3-70b-instruct-v1:0", // Level 2
+  "us.amazon.nova-lite-v1:0", // Level 3
+  "zai.glm-4.7", // Level 4
+  "us.anthropic.claude-sonnet-4-6", // Level 5 (shared final)
 ] as const;
-
-
-
-
 
 
 

@@ -93,8 +93,8 @@ const stripReasoning = (raw: string): string => {
 /**
  * Invoke a Bedrock model via the Converse API. Converse normalizes the
  * request/response shape across model providers, so the same code path works
- * for the mixed model-roulette pool (Anthropic, Meta, OpenAI-OSS, DeepSeek,
- * Moonshot, Z.ai, ...).
+ * for the mixed per-level model set (Anthropic, Meta, OpenAI-OSS, Z.ai,
+ * Amazon Nova, ...).
  */
 const invokeBedrock = async ({
   levelId,
@@ -133,10 +133,12 @@ const invokeBedrock = async ({
 
     const response = await bedrockClient.send(command);
 
-    // Extract the response text. Some models (e.g. reasoning models like
-    // openai.gpt-oss-safeguard) put their output inside `reasoningContent`
-    // blocks rather than top-level `text` blocks. We scan all content blocks
-    // for any usable text.
+    // Extract the response text — ONLY from genuine `text` blocks. Reasoning
+    // models return their chain-of-thought in separate `reasoningContent`
+    // blocks; we must NEVER surface that to players. If a model returns only
+    // reasoning (e.g. it was truncated before emitting the final answer), we
+    // treat it as a failed invocation → fallback, rather than leaking the
+    // internal monologue.
     const contentBlocks = response.output?.message?.content ?? [];
     let text: string | undefined;
     for (const block of contentBlocks) {
@@ -144,15 +146,11 @@ const invokeBedrock = async ({
         text = block.text;
         break;
       }
-      // Reasoning models: extract from reasoningContent
-      if ((block as any).reasoningContent?.reasoningText?.text) {
-        text = (block as any).reasoningContent.reasoningText.text;
-        // Don't break — prefer a plain text block if one follows.
-      }
     }
     if (!text) {
       throw new Error(
-        "Invalid response format from Bedrock Converse: no text in content blocks"
+        "Invalid response format from Bedrock Converse: no text block " +
+          "(model may have returned only reasoning or been truncated)"
       );
     }
 
@@ -209,18 +207,9 @@ export const invokeBedrockPersistToDynamo = async ({
   newUserMessage,
 }: InvokeBedrockPersistToDynamoProps): Promise<InvokeBedrockResponse> => {
   try {
-    // Model roulette: resolve (and lock, on first call) this team's model
-    // for THIS level. Each level re-rolls a fresh model.
-    let modelId: string;
-    try {
-      modelId = await TeamLevelOperations.getOrAssignModel(teamId, levelId);
-    } catch (error) {
-      console.error(
-        `ERROR: Failed to resolve model for team ${teamId} at level ${levelId}, using fallback:`,
-        error
-      );
-      modelId = bedrockConfig.fallbackModelId;
-    }
+    // Fixed model per level position (same mapping for all teams). Resolved
+    // from the team's route order; self-falls back internally on any error.
+    const modelId = await TeamLevelOperations.getModelForLevel(teamId, levelId);
 
     // Get existing message history from DynamoDB
     let messageHistory: Array<Message> = [];
