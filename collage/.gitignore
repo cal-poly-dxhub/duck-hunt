@@ -1,0 +1,7 @@
+# Generated output and local junk — only the script/docs/deps should be tracked.
+collages/
+downloaded_photos/
+__pycache__/
+*.pyc
+.DS_Store
+.venv/

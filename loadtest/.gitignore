@@ -1,0 +1,7 @@
+node_modules
+package-lock.json
+targets.json
+
+# The root .gitignore ignores *.js (for compiled TS output); the k6 script is
+# hand-written source and must be tracked.
+!scavenger.js
