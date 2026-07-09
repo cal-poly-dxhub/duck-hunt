@@ -30,6 +30,10 @@ export class DatastoreResources extends Construct {
         removalPolicy: props.removalPolicy ?? cdk.RemovalPolicy.DESTROY,
         tableName: `ScavengerHuntData-${props.uniqueId}`,
         timeToLiveAttribute: "ttl", // not used, but deleted_at is not longer ttl
+        // On-demand: auto-scales read/write throughput. Without this, CDK
+        // defaults to PROVISIONED 5 RCU/5 WCU, which throttles almost
+        // immediately under concurrent play. GSIs inherit this billing mode.
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       }
     );
 
