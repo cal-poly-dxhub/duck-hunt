@@ -8,6 +8,7 @@ import {
   Button,
   Container,
   Flex,
+  Loader,
   Modal,
   Stack,
   Text,
@@ -16,7 +17,12 @@ import {
 import "@mantine/core/styles.css";
 import { frontendConfig } from "@shared/config";
 import { Message, MessageRole, UUID } from "@shared/types";
-import { IconSend, IconTrash, IconUpload } from "@tabler/icons-react";
+import {
+  IconCheck,
+  IconSend,
+  IconTrash,
+  IconUpload,
+} from "@tabler/icons-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -70,6 +76,16 @@ export default function Chat() {
     {}
   );
   const [needsTeamPhoto, setNeedsTeamPhoto] = useState<boolean>(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState<boolean>(false);
+  const [photoSaved, setPhotoSaved] = useState<boolean>(false);
+  // Bumped after a successful photo upload to re-trigger the /level fetch, so
+  // the page advances on its own instead of the player having to refresh.
+  const [refreshCounter, setRefreshCounter] = useState<number>(0);
+
+  // Location consent: undefined = not yet decided (show modal), true/false = decided.
+  const [locationConsent, setLocationConsent] = useState<boolean | undefined>(
+    undefined
+  );
 
   const {
     userId,
@@ -78,6 +94,19 @@ export default function Chat() {
     setTeamId,
     isLoading: gameLoading,
   } = useGame();
+
+  // Load any prior location decision from localStorage (once per device).
+  useEffect(() => {
+    const stored = localStorage.getItem("locationConsent");
+    if (stored === "granted") setLocationConsent(true);
+    else if (stored === "denied") setLocationConsent(false);
+    // else leave undefined so the consent modal shows
+  }, []);
+
+  const handleLocationDecision = (granted: boolean) => {
+    localStorage.setItem("locationConsent", granted ? "granted" : "denied");
+    setLocationConsent(granted);
+  };
 
   const loadingMessage: Message<MessageRole.Assistant> = {
     id: v4() as UUID,
@@ -210,15 +239,32 @@ export default function Chat() {
   useEffect(() => {
     const handleCheckLocation = async () => {
       setMessages([loadingMessage]);
-      const { mapLink, currentTeamLevel, messageHistory, requiresPhoto } =
-        await scavengerHuntApi.level(levelIdFromUrl);
+      const {
+        mapLink,
+        currentTeamLevel,
+        messageHistory,
+        requiresPhoto,
+        endScreen,
+      } = await scavengerHuntApi.level(levelIdFromUrl);
 
       console.log("INFO: Fetched level data:", {
         currentTeamLevel,
         messageHistory,
         mapLink,
         requiresPhoto,
+        endScreen,
       });
+
+      // Hunt complete: send the winner to the win screen, everyone else to the
+      // finish screen. Static pages live in frontend/public (served at root).
+      if (endScreen === "win") {
+        window.location.href = "/win.html";
+        return;
+      }
+      if (endScreen === "finish") {
+        window.location.href = "/finish.html";
+        return;
+      }
 
       if (requiresPhoto) {
         setNeedsTeamPhoto(true);
@@ -239,16 +285,18 @@ export default function Chat() {
       handleCheckLocation();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, teamId, levelIdFromUrl, endSequenceFromUrl]);
+  }, [userId, teamId, levelIdFromUrl, endSequenceFromUrl, refreshCounter]);
 
-  // ping location interval
+  // ping location interval — only runs after the player consents to location.
   useEffect(() => {
+    if (locationConsent !== true) return;
+
     const interval = setInterval(() => {
       scavengerHuntApi.pingCoordinates();
     }, frontendConfig.coordinatePingIntervalMs);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [locationConsent]);
 
   return (
     <Box
@@ -262,6 +310,76 @@ export default function Chat() {
     >
       <style>{blinkAnimation}</style>
       <style>{dotAnimation}</style>
+
+      {/* Location Consent Modal — shown once per device before any location ping */}
+      <Modal
+        closeOnClickOutside={false}
+        closeButtonProps={{ style: { display: "none" } }}
+        opened={!gameLoading && !!teamId && locationConsent === undefined}
+        onClose={() => {}}
+        title="📍 Location Access"
+        centered
+        size="lg"
+        styles={{
+          title: {
+            fontFamily: "monospace",
+            color: "var(--mantine-color-green-5)",
+          },
+          header: { backgroundColor: "var(--mantine-color-dark-7)" },
+          content: { backgroundColor: "var(--mantine-color-dark-7)" },
+        }}
+      >
+        <Box p="md" bg="dark.7" ff="monospace">
+          <Text c="green.5" mb="sm" fw={700}>
+            Duck Hunt uses your device&apos;s location during the game.
+          </Text>
+          <Text c="green.5" mb="sm" size="sm">
+            <b>What we collect:</b> While you&apos;re playing, the game
+            periodically records your team&apos;s approximate GPS coordinates
+            (roughly every 10 seconds).
+          </Text>
+          <Text c="green.5" mb="sm" size="sm">
+            <b>Why:</b> Your location is used <b>only</b> to power the live game
+            dashboard — it lets the game organizers see where teams are on
+            campus during the hunt (for coordination and fun). It is{" "}
+            <b>not</b> used to identify you personally, is <b>not</b> shared
+            with any third party, and is <b>not</b> used for advertising or any
+            purpose beyond running this event.
+          </Text>
+          <Text c="green.5" mb="sm" size="sm">
+            <b>How long we keep it:</b> Your location data lives only inside
+            this game&apos;s private database and is <b>deleted along with all
+            game data when the event is over</b>. It is not retained after the
+            hunt ends.
+          </Text>
+          <Text c="green.5" mb="md" size="sm">
+            <b>Your choice:</b> Location sharing is part of the game experience.
+            If you don&apos;t enable it, you can still play and chat with the
+            characters, but your team won&apos;t appear on the live dashboard.
+            Your browser will also ask for its own permission — you can change
+            or revoke it any time in your browser settings.
+          </Text>
+          <Flex gap="sm">
+            <Button
+              fullWidth
+              color="green"
+              style={{ fontFamily: "monospace" }}
+              onClick={() => handleLocationDecision(true)}
+            >
+              Enable Location &amp; Play
+            </Button>
+            <Button
+              fullWidth
+              variant="outline"
+              color="green"
+              style={{ fontFamily: "monospace" }}
+              onClick={() => handleLocationDecision(false)}
+            >
+              Play Without Location
+            </Button>
+          </Flex>
+        </Box>
+      </Modal>
 
       {/* Team Photo Upload Modal */}
       <Modal
@@ -281,11 +399,21 @@ export default function Chat() {
         }}
       >
         <Box p="md" bg="dark.7" ff="monospace">
-          <Text c="green.5" mb="md">
-            Please upload a team photo to continue with the game. If your team
-            has already uploaded a photo, refresh the page or contact the
-            GameMakers.
-          </Text>
+          {photoSaved ? (
+            <Text c="green.5" mb="md">
+              <IconCheck
+                size="1rem"
+                style={{ verticalAlign: "middle", marginRight: 6 }}
+              />
+              Photo saved! Loading your next clue...
+            </Text>
+          ) : (
+            <Text c="green.5" mb="md">
+              Please upload a team photo to continue with the game. If your team
+              has already uploaded a photo, refresh the page or contact the
+              GameMakers.
+            </Text>
+          )}
           <input
             type="file"
             id="team-photo"
@@ -293,31 +421,52 @@ export default function Chat() {
             style={{ display: "none" }}
             onChange={async (e) => {
               const file = e.target.files?.[0];
-              if (file) {
-                try {
-                  const result = await scavengerHuntApi.uploadTeamPhoto(file);
-                  if (result.success) {
+              if (!file) return;
+              setUploadingPhoto(true);
+              try {
+                const result = await scavengerHuntApi.uploadTeamPhoto(file);
+                if (result.success) {
+                  // Confirm success, then re-fetch level so the page advances
+                  // automatically (no manual refresh needed).
+                  setPhotoSaved(true);
+                  setTimeout(() => {
                     setNeedsTeamPhoto(false);
-                  } else {
-                    // TODO: better error handling
-                    alert(`Error: ${result.error}`);
-                  }
-                } catch (error) {
-                  console.error("Error uploading team photo:", error);
-                  alert("Failed to upload team photo. Please try again.");
+                    setPhotoSaved(false);
+                    setUploadingPhoto(false);
+                    setRefreshCounter((c) => c + 1);
+                  }, 1500);
+                } else {
+                  setUploadingPhoto(false);
+                  alert(`Error: ${result.error}`);
                 }
+              } catch (error) {
+                console.error("Error uploading team photo:", error);
+                setUploadingPhoto(false);
+                alert("Failed to upload team photo. Please try again.");
+              } finally {
+                // allow re-selecting the same file if a retry is needed
+                e.target.value = "";
               }
             }}
           />
-          <Button
-            fullWidth
-            leftSection={<IconUpload size="1rem" />}
-            onClick={() => document.getElementById("team-photo")?.click()}
-            color="green"
-            style={{ fontFamily: "monospace" }}
-          >
-            Upload Team Photo
-          </Button>
+          {!photoSaved && (
+            <Button
+              fullWidth
+              disabled={uploadingPhoto}
+              leftSection={
+                uploadingPhoto ? (
+                  <Loader size="1rem" color="green" />
+                ) : (
+                  <IconUpload size="1rem" />
+                )
+              }
+              onClick={() => document.getElementById("team-photo")?.click()}
+              color="green"
+              style={{ fontFamily: "monospace" }}
+            >
+              {uploadingPhoto ? "Uploading..." : "Upload Team Photo"}
+            </Button>
+          )}
         </Box>
       </Modal>
 
