@@ -114,12 +114,20 @@ const invokeBedrock = async ({
     const maxTokens = levelData.max_tokens || bedrockConfig.defaultMaxTokens;
 
     // Converse expects messages as { role, content: [{ text }] }.
-    const messages = messageHistory.map((msg) => ({
+    let messages = messageHistory.map((msg) => ({
       role: (msg.role === MessageRole.User ? "user" : "assistant") as
         | "user"
         | "assistant",
       content: [{ text: msg.content }],
     }));
+
+    // Some models (e.g. Meta Llama 3) strictly require the conversation to
+    // START with a user message and reject a leading assistant turn with
+    // "A conversation must start with a user message." Drop any leading
+    // assistant message(s) so history always begins with a user turn.
+    while (messages.length > 0 && messages[0].role === "assistant") {
+      messages = messages.slice(1);
+    }
 
     const command = new ConverseCommand({
       modelId,
