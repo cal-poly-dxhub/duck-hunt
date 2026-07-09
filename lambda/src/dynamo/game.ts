@@ -18,6 +18,8 @@ export interface Game extends BaseEntity {
   levelsInGame?: number;
   teams: Array<Team>;
   levels: Array<Level>;
+  /** Team id of the first team to complete the hunt (set atomically, once). */
+  winner_team_id?: string;
 }
 
 // GAME Operations
@@ -99,6 +101,44 @@ export class GameOperations {
 
     const { PK, SK, ItemType, ...game } = result.Attributes!;
     return game as Game;
+  }
+
+  /**
+   * Atomically claim the "winner" slot for a game. The FIRST team to call this
+   * wins (its id is stored via a conditional write); every later caller loses
+   * the race. Returns the winning team id either way, so callers can compare it
+   * to their own team id to decide win vs. finish screen. Idempotent: a team
+   * that already won and calls again still reads itself as the winner.
+   */
+  static async claimWinner(
+    gameId: string,
+    teamId: string
+  ): Promise<string> {
+    try {
+      const result = await docClient.send(
+        new UpdateCommand({
+          TableName: DUCK_HUNT_TABLE_NAME,
+          Key: { PK: `GAME#${gameId}`, SK: "#METADATA" },
+          UpdateExpression:
+            "SET winner_team_id = :teamId, updated_at = :updatedAt",
+          ConditionExpression: "attribute_not_exists(winner_team_id)",
+          ExpressionAttributeValues: {
+            ":teamId": teamId,
+            ":updatedAt": getCurrentTimestamp(),
+          },
+          ReturnValues: "ALL_NEW",
+        })
+      );
+      console.log(`INFO: Team ${teamId} WON game ${gameId}`);
+      return result.Attributes?.winner_team_id as string;
+    } catch (error: any) {
+      // Someone already won. Read who.
+      if (error?.name === "ConditionalCheckFailedException") {
+        const game = await this.getById(gameId);
+        return (game?.winner_team_id as string) ?? teamId;
+      }
+      throw error;
+    }
   }
 
   static async delete(gameId: string): Promise<void> {

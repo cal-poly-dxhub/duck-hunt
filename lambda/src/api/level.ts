@@ -9,6 +9,7 @@ import {
   UUID,
 } from "@shared/types";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import { GameOperations } from "src/dynamo/game";
 import { Level } from "src/dynamo/level";
 import { MessageOperations } from "src/dynamo/message";
 import { PhotoOperations } from "src/dynamo/photo";
@@ -233,6 +234,17 @@ export const handler = async (
         "INFO: Current team level is already completed, returning completion message."
       );
 
+      // Team already finished. Read (don't claim) the winner so refreshes keep
+      // showing the correct screen. If somehow no winner is recorded yet, claim
+      // it now (covers the edge case where the final level was marked completed
+      // without going through the claim path).
+      const winnerTeamId = await GameOperations.claimWinner(
+        gameId,
+        headers["team-id"] as UUID
+      );
+      const endScreen =
+        winnerTeamId === headers["team-id"] ? "win" : "finish";
+
       const messageResponse: LevelResponseBody = {
         currentTeamLevel: currentTeamLevel.id as UUID,
         messageHistory: [
@@ -245,6 +257,7 @@ export const handler = async (
         ],
         requiresPhoto: false,
         mapLink: null,
+        endScreen,
       };
 
       return {
@@ -352,6 +365,15 @@ export const handler = async (
           headers["team-id"]
         );
 
+        // Team just finished the hunt. Atomically claim the winner slot: the
+        // first team to reach here wins; everyone else gets the finish screen.
+        const winnerTeamId = await GameOperations.claimWinner(
+          gameId,
+          headers["team-id"] as UUID
+        );
+        const endScreen =
+          winnerTeamId === headers["team-id"] ? "win" : "finish";
+
         return {
           statusCode: 202,
           headers: corsHeaders,
@@ -366,6 +388,7 @@ export const handler = async (
             ],
             currentTeamLevel: currentTeamLevel.id as UUID,
             requiresPhoto: true,
+            endScreen,
           } as LevelResponseBody),
         };
       }
