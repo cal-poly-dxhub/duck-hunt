@@ -154,7 +154,12 @@ export class MessageOperations {
           role,
           content,
         };
-      }) || []
+      })
+        // Sort chronologically by created_at. The sort key only has 1-second
+        // granularity (MESSAGE#{epochSeconds}#{uuid}), so a user message and its
+        // assistant reply in the same second can come back out of order. created_at
+        // is a full ISO-8601 (millisecond) timestamp, so lexical sort == chronological.
+        .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))) || []
     );
   }
 

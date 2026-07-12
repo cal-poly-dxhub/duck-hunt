@@ -28,6 +28,10 @@ export class DatastoreResources extends Construct {
           type: dynamodb.AttributeType.STRING,
         },
         removalPolicy: props.removalPolicy ?? cdk.RemovalPolicy.DESTROY,
+        // Explicitly disable deletion protection so the table can be torn
+        // down with the stack. Without this, a table with protection enabled
+        // (e.g. set manually) causes stack deletion to fail.
+        deletionProtection: false,
         tableName: `ScavengerHuntData-${props.uniqueId}`,
         timeToLiveAttribute: "ttl", // not used, but deleted_at is not longer ttl
         // On-demand: auto-scales read/write throughput. Without this, CDK
