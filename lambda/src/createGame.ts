@@ -340,8 +340,13 @@ class GameCreationService {
       let teamLevels: any[] = [];
 
       if (levelsInGame === levels.length) {
-        // Team plays all levels in order
-        teamLevels = levels;
+        // Team plays ALL levels, but in a randomized order per team, with the
+        // final level (last in config) always kept last. This gives every team
+        // the same set of locations in a different sequence.
+        const shuffledLevels = [...availableLevels].sort(
+          () => Math.random() - 0.5
+        );
+        teamLevels = [...shuffledLevels, finalLevel];
       } else {
         // Team gets a subset of levels plus the final level
         const levelsNeeded = levelsInGame - 1; // Subtract 1 for the final level
