@@ -1,0 +1,16 @@
+{
+  "name": "duck-hunt-loadtest",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Load-test harness for Duck Hunt (setup + CloudWatch metrics helpers). The k6 script (scavenger.js) is run separately via the k6 binary.",
+  "scripts": {
+    "setup": "node setup.mjs",
+    "metrics": "node metrics.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.850.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.850.0",
+    "@aws-sdk/client-cloudwatch": "^3.850.0"
+  }
+}
