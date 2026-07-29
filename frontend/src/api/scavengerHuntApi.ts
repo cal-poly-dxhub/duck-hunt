@@ -9,6 +9,9 @@ import {
 } from "@shared/types";
 import { v4 } from "uuid";
 import { apiRequest } from "./apiRequest";
+import { getApiBaseUrl } from "./env";
+
+const API_BASE_URL = getApiBaseUrl();
 
 // /message
 const message = async (
@@ -31,7 +34,7 @@ const message = async (
 
     const { data, success, error } = await apiRequest<MessageResponseBody>(
       "POST",
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/message`,
+      `${API_BASE_URL}/message`,
       {
         body: { message: userMessage },
       }
@@ -75,7 +78,7 @@ const level = async (levelId: string | null): Promise<LevelResponseBody> => {
     const { data, status, success, error } =
       await apiRequest<LevelResponseBody>(
         "POST",
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/level`,
+        `${API_BASE_URL}/level`,
         {
           body: { levelId },
         }
@@ -121,7 +124,7 @@ const clearChat = async (): Promise<MessageResponseBody> => {
   try {
     const { data, success, error } = await apiRequest<MessageResponseBody>(
       "POST",
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/clear-chat`
+      `${API_BASE_URL}/clear-chat`
     );
 
     if (!success) {
@@ -183,7 +186,7 @@ const pingCoordinates = async () => {
     const coordinates = await getCoordinates();
     await apiRequest(
       "POST",
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/ping-coordinates`,
+      `${API_BASE_URL}/ping-coordinates`,
       {
         body: coordinates,
       }
@@ -226,7 +229,7 @@ const uploadTeamPhoto = async (file: File) => {
     // Use your existing apiRequest function
     const { data, success, error } = await apiRequest(
       "POST",
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/upload-photo`,
+      `${API_BASE_URL}/upload-photo`,
       {
         body: {
           photo: base64File,

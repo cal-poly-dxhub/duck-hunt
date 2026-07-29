@@ -1,5 +1,8 @@
 import * as cdk from "aws-cdk-lib";
+import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import { Construct } from "constructs";
+import * as fs from "fs";
+import * as path from "path";
 
 export interface FrontendResourcesProps {
   uniqueId: string;
@@ -8,11 +11,41 @@ export interface FrontendResourcesProps {
   photoBucket: cdk.aws_s3.Bucket;
 }
 
+// Path to the statically-exported Next.js frontend (produced by
+// `yarn build` in frontend/, i.e. `next build` with output: "export").
+const FRONTEND_OUT_DIR = path.join(__dirname, "..", "frontend", "out");
+
 export class FrontendResources extends Construct {
   public readonly distribution: cdk.aws_cloudfront.Distribution;
 
   constructor(scope: Construct, id: string, props: FrontendResourcesProps) {
     super(scope, id);
+
+    // The asset below requires a built frontend, which would otherwise make
+    // `cdk ls`, `cdk diff` and `cdk destroy` impossible on a clean checkout.
+    // Set DUCK_HUNT_SKIP_FRONTEND_CHECK=1 for those commands; deploying with it
+    // set uploads env.js only and leaves existing objects in place.
+    const frontendBuilt = fs.existsSync(
+      path.join(FRONTEND_OUT_DIR, "index.html")
+    );
+    const skipFrontendCheck =
+      process.env.DUCK_HUNT_SKIP_FRONTEND_CHECK === "1";
+
+    if (!frontendBuilt && !skipFrontendCheck) {
+      throw new Error(
+        `Frontend build not found at ${FRONTEND_OUT_DIR}. ` +
+          `Run \`yarn --cwd frontend build\` first ` +
+          `(or use scripts/deploy.sh, which does this automatically). ` +
+          `For cdk ls/diff/destroy, set DUCK_HUNT_SKIP_FRONTEND_CHECK=1.`
+      );
+    }
+    if (!frontendBuilt) {
+      console.warn(
+        `WARNING: ${FRONTEND_OUT_DIR} is missing and ` +
+          `DUCK_HUNT_SKIP_FRONTEND_CHECK=1 is set. The frontend asset is ` +
+          `excluded from this synth — do not use it to deploy.`
+      );
+    }
 
     // s3 bucket for static assets
     const siteBucket = new cdk.aws_s3.Bucket(
@@ -74,121 +107,24 @@ export class FrontendResources extends Construct {
       }
     );
 
-    // codebuild project to build frontend from GitHub
-    const build = new cdk.aws_codebuild.Project(
-      this,
-      `FrontendBuild-${props.uniqueId}`,
-      {
-        source: cdk.aws_codebuild.Source.gitHub({
-          owner: "cal-poly-dxhub",
-          repo: "duck-hunt",
-          branchOrRef: "main",
-        }),
-        environment: {
-          // TODO: try without privilege?
-          privileged: true,
-        },
-        artifacts: cdk.aws_codebuild.Artifacts.s3({
-          bucket: siteBucket,
-          includeBuildId: false,
-          packageZip: false,
-          name: "/",
-          encryption: false,
-        }),
-        environmentVariables: {
-          NEXT_PUBLIC_AWS_REGION: {
-            value: cdk.Aws.REGION,
-          },
-          NEXT_PUBLIC_API_BASE_URL: {
-            value: props.api.url + "api",
-          },
-        },
-        buildSpec: cdk.aws_codebuild.BuildSpec.fromObject({
-          version: "0.2",
-          phases: {
-            install: {
-              "runtime-versions": {
-                nodejs: "22",
-              },
-              commands: [
-                "cd frontend",
-                "echo installing dependencies...",
-                "npm install",
-              ],
-            },
-            build: {
-              commands: ["echo building...", "npm run build"],
-            },
-          },
-          artifacts: {
-            "base-directory": "frontend/out",
-            "s3-artifact-acl": "bucket-owner-full-control",
-            files: ["**/*"],
-          },
-        }),
-        logging: {
-          cloudWatch: {
-            logGroup: new cdk.aws_logs.LogGroup(
-              this,
-              `FrontendBuildLogGroup-${props.uniqueId}`,
-              {
-                removalPolicy: props.removalPolicy ?? cdk.RemovalPolicy.DESTROY,
-                retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
-              }
-            ),
-          },
-        },
-      }
-    );
+    const apiBaseUrl = `${props.api.url}api`;
+    const envJs = `window.__ENV__ = ${JSON.stringify({
+      API_BASE_URL: apiBaseUrl,
+    })};`;
 
-    // when codebuild updates, allow invalidation of cloudfront cache
-    this.distribution.grant(build.role!, "cloudfront:CreateInvalidation");
-
-    // needs s3 access
-    siteBucket.grantWrite(build);
-
-    // ensure the build runs after all env vars are ready
-    build.node.addDependency(this.distribution);
-    build.node.addDependency(props.api);
-
-    // trigger codebuild project on stack creation and update
-    const triggerBuild = new cdk.custom_resources.AwsCustomResource(
-      this,
-      `TriggerCodeBuild-${props.uniqueId}`,
-      {
-        onCreate: {
-          outputPaths: ["BuildId"],
-          service: "CodeBuild",
-          action: "startBuild",
-          parameters: {
-            projectName: build.projectName,
-          },
-          physicalResourceId: cdk.custom_resources.PhysicalResourceId.of(
-            `trigger-codebuild-${Date.now()}`
-          ),
-        },
-        onUpdate: {
-          outputPaths: ["BuildId"],
-          service: "CodeBuild",
-          action: "startBuild",
-          parameters: {
-            projectName: build.projectName,
-          },
-          physicalResourceId: cdk.custom_resources.PhysicalResourceId.of(
-            `trigger-codebuild-${Date.now()}`
-          ),
-        },
-        policy: cdk.custom_resources.AwsCustomResourcePolicy.fromStatements([
-          new cdk.aws_iam.PolicyStatement({
-            effect: cdk.aws_iam.Effect.ALLOW,
-            actions: ["codebuild:StartBuild"],
-            resources: [build.projectArn],
-          }),
-        ]),
-      }
-    );
-
-    // trigger build once it is ready
-    triggerBuild.node.addDependency(build);
+    new s3deploy.BucketDeployment(this, `FrontendDeployment-${props.uniqueId}`, {
+      sources: frontendBuilt
+        ? [
+            s3deploy.Source.asset(FRONTEND_OUT_DIR),
+            s3deploy.Source.data("env.js", envJs),
+          ]
+        : [s3deploy.Source.data("env.js", envJs)],
+      destinationBucket: siteBucket,
+      distribution: this.distribution,
+      distributionPaths: ["/*"],
+      // Only prune when the real build is present, so a bypassed synth can
+      // never wipe a deployed site.
+      prune: frontendBuilt,
+    });
   }
 }

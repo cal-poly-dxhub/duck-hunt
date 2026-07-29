@@ -4,6 +4,9 @@
 *.d.ts
 node_modules
 
+# macOS Finder metadata
+.DS_Store
+
 # CDK asset staging directory
 .cdk.staging
 cdk.out
@@ -11,10 +14,16 @@ cdk.out
 cdk.context.json
 
 .env
-deploy.sh
+# Only the legacy root-level deploy script; scripts/deploy.sh is tracked.
+/deploy.sh
 dist
 *.zip
 .yarn
-yarn.lock
 
 assets
+
+# Real game data from played events — never commit participant photos or chat logs.
+collage/downloaded_photos/
+collage/collages/
+transcripts/transcript-*
+transcripts/prompt-injection-slides.html

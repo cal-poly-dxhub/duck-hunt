@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Cancel superseded runs on the same ref instead of queueing them.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Let Corepack fetch the pinned Yarn (packageManager) without prompting.
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+
+jobs:
+  verify:
+    name: Typecheck, test, lint, build, synth
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          # Matches the Lambda runtime (NODEJS_22_X) and satisfies Next 15 / React 19.
+          node-version: "22"
+
+      - name: Enable Corepack (pins Yarn 4.9.2 from package.json)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Typecheck CDK app
+        run: yarn build
+
+      - name: Run tests
+        run: yarn test
+
+      - name: Lint frontend
+        run: yarn --cwd frontend lint
+
+      - name: Lint shell scripts
+        run: shellcheck scripts/*.sh
+
+      # Must precede synth: the stack reads frontend/out from disk.
+      - name: Build frontend (static export)
+        run: yarn --cwd frontend build
+
+      - name: Synthesize CloudFormation template
+        env:
+          UNIQUE_ID: ci
+        run: yarn cdk synth --quiet
