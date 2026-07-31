@@ -136,8 +136,8 @@ fi
 # (photo-bucket-<id>, game-config-<id>), so it must satisfy S3 naming rules.
 # Validating here turns an opaque mid-deploy CloudFormation failure into a
 # clear message. 50 chars keeps "photo-bucket-" + id under the 63-char limit.
-if [[ ! "${UNIQUE_ID}" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
-  die "UNIQUE_ID must start with a lowercase letter or digit and contain only lowercase letters, digits and hyphens. Got: '${UNIQUE_ID}'"
+if [[ ! "${UNIQUE_ID}" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]; then
+  die "UNIQUE_ID must start and end with a lowercase letter or digit and contain only lowercase letters, digits and hyphens. Got: '${UNIQUE_ID}'"
 fi
 if (( ${#UNIQUE_ID} > 50 )); then
   die "UNIQUE_ID must be 50 characters or fewer (S3 bucket name limit). Got ${#UNIQUE_ID}."
