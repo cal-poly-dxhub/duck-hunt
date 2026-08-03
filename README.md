@@ -264,6 +264,10 @@ source .env && yarn cdk deploy
   `env.js`, so the static build is not tied to a particular stack
 - Lambda functions are built and bundled automatically by CDK using NodejsFunction
 - DynamoDB tables and S3 buckets are created by CDK
+- Because the stack reads `frontend/out` at synth time, every `cdk` command needs a
+  frontend build. For commands that don't deploy — `cdk ls`, `cdk diff`, `cdk destroy` —
+  set `DUCK_HUNT_SKIP_FRONTEND_CHECK=1` to synthesize without one. Leave it unset when
+  deploying, so a missing build fails loudly instead of publishing an incomplete site
 
 ### Redeployment
 

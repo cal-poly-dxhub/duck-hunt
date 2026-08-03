@@ -21,10 +21,8 @@ export class FrontendResources extends Construct {
   constructor(scope: Construct, id: string, props: FrontendResourcesProps) {
     super(scope, id);
 
-    // The asset below requires a built frontend, which would otherwise make
-    // `cdk ls`, `cdk diff` and `cdk destroy` impossible on a clean checkout.
-    // Set DUCK_HUNT_SKIP_FRONTEND_CHECK=1 for those commands; deploying with it
-    // set uploads env.js only and leaves existing objects in place.
+    // Fail fast rather than deploy an incomplete site. The bypass exists for
+    // non-deploy commands (cdk ls/diff/destroy) — see "Deployment" in README.md.
     const frontendBuilt = fs.existsSync(
       path.join(FRONTEND_OUT_DIR, "index.html")
     );
