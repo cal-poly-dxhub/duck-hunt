@@ -226,21 +226,25 @@ This project uses a single-table design for DynamoDB. The schema is defined in `
 
 ### Quick Deployment
 
-Deploy infrastructure to AWS:
+`scripts/deploy.sh` verifies prerequisites and credentials, resolves `UNIQUE_ID`,
+installs dependencies, builds the frontend, bootstraps CDK, and deploys:
 
 ```bash
-source .env && yarn cdk deploy
+./scripts/deploy.sh -r us-west-2 -u dev-yourname
 ```
+
+Flags: `-r <region>` (required), `-u <id>`, `-c <game-config.json>`, `-p <aws-profile>`,
+`-y` (non-interactive, skips CDK approval prompts), `-h`.
 
 ### Manual Deployment
 
-If you prefer manual control:
+The frontend must be built **before** any `cdk` command, because the stack uploads
+`frontend/out` from disk and fails fast if it is missing:
 
 ```bash
-# Build CDK stack
-yarn build
-
-# Deploy with CDK (Lambda and frontend build automatically from GitHub)
+yarn install
+yarn build                        # typecheck
+yarn --cwd frontend build         # produces frontend/out
 source .env && yarn cdk deploy
 ```
 
@@ -249,33 +253,44 @@ source .env && yarn cdk deploy
 1. **Note the API URL** from CDK output
 2. **Upload game configuration** to the `game-config` S3 bucket
 3. **Check CloudWatch Logs** for game URLs in `CreateGameLambdaLogGroup`
-4. **Monitor CodeBuild** for frontend build progress in AWS Console
 
 ### Deployment Notes
 
-- The `UNIQUE_ID` environment variable creates unique stack names for multiple deployments
-- Frontend is built automatically by CodeBuild from GitHub main branch and deployed to CloudFront via S3
+- The `UNIQUE_ID` environment variable creates unique stack names for multiple deployments.
+  It is also used in globally-unique S3 bucket names, so use lowercase letters, digits and
+  hyphens only
+- The frontend is built locally and uploaded by CDK's `BucketDeployment`, which also
+  invalidates CloudFront. The API Gateway URL is injected at deploy time via a generated
+  `env.js`, so the static build is not tied to a particular stack
 - Lambda functions are built and bundled automatically by CDK using NodejsFunction
 - DynamoDB tables and S3 buckets are created by CDK
-- Frontend environment variables are automatically injected during CodeBuild
+- Because the stack reads `frontend/out` at synth time, every `cdk` command needs a
+  frontend build. For commands that don't deploy — `cdk ls`, `cdk diff`, `cdk destroy` —
+  set `DUCK_HUNT_SKIP_FRONTEND_CHECK=1` to synthesize without one. Leave it unset when
+  deploying, so a missing build fails loudly instead of publishing an incomplete site
 
 ### Redeployment
 
 For subsequent deployments after code changes:
 
 ```bash
+yarn --cwd frontend build         # only if the frontend changed
 source .env && yarn cdk deploy
 ```
 
-CDK will only update changed resources. Frontend rebuilds automatically from GitHub.
+CDK will only update changed resources.
 
 ### Destroy Stack
 
 To remove all AWS resources:
 
 ```bash
-source .env && yarn cdk destroy
+source .env && DUCK_HUNT_SKIP_FRONTEND_CHECK=1 yarn cdk destroy
 ```
+
+`DUCK_HUNT_SKIP_FRONTEND_CHECK=1` lets CDK synthesize without a built frontend. Use it for
+`cdk destroy`, `cdk diff` and `cdk ls` on a clean checkout; leave it unset when deploying,
+so a missing build fails loudly instead of publishing an incomplete site.
 
 **Warning:** This deletes all data including DynamoDB tables and S3 buckets.
 

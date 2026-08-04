@@ -22,6 +22,9 @@ export default function RootLayout({
   return (
     <html lang="en" {...mantineHtmlProps}>
       <head>
+        {/* Runtime env config injected by CDK at deploy time (see lib/frontend.ts). */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script src="/env.js" />
         <ColorSchemeScript />
       </head>
       <body>
