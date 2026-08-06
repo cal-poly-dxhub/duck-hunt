@@ -60,6 +60,8 @@ export interface LevelResponseBody {
   messageHistory: Array<Message>;
   mapLink: string | null;
   requiresPhoto: boolean;
+  /** "win" = finished first, "finish" = finished later, null/absent = still playing. */
+  endScreen?: "win" | "finish" | null;
 }
 
 // ------------ apiRequest response schema ------------

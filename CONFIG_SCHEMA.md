@@ -86,10 +86,17 @@
 
 ## Game Logic Notes
 
-- **Level Order**: The order of levels in the array doesn't matter for gameplay
+- **Level Order**: The **last level** in the `levels` array is the shared final level; the
+  remaining levels are shuffled independently for each team, so their order in the array
+  does not determine play order
 - **Final Level**: The **last level** in the `levels` array will be the final level for **all teams**
 - **Subset Selection**: `levelsInGame` determines how many levels each team will play from the available levels
 - **Team Levels**: Each team gets a subset of `levelsInGame` levels, but all teams end with the same final level
+- **Models**: The AI model is chosen by **route position**, not by level, from `levelModels` in
+  `shared/src/config.ts` — entry `[0]` serves every team's 1st stop, `[1]` the 2nd, and so on.
+  Positions beyond the end of that list fall back to `bedrockConfig.fallbackModelId`, so keep
+  `levelModels` at least as long as `levelsInGame`. Because routes are shuffled, `max_tokens` on a
+  level cannot be used to tune a specific model; use `modelMinMaxTokens` for that
 
 ## Validation Rules
 

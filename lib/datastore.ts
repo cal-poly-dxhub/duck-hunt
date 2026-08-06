@@ -28,8 +28,12 @@ export class DatastoreResources extends Construct {
           type: dynamodb.AttributeType.STRING,
         },
         removalPolicy: props.removalPolicy ?? cdk.RemovalPolicy.DESTROY,
+        // Off so the table tears down with the stack.
+        deletionProtection: false,
         tableName: `ScavengerHuntData-${props.uniqueId}`,
         timeToLiveAttribute: "ttl", // not used, but deleted_at is not longer ttl
+        // On-demand; the CDK default of 5 RCU/WCU throttles under concurrent play.
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       }
     );
 

@@ -16,6 +16,8 @@ export interface Message extends BaseEntity {
   level_id: string;
   role: string;
   content: string;
+  /** True when this assistant message is a hardcoded fallback, not a model response. */
+  is_fallback?: boolean;
 }
 
 // MESSAGE Operations
@@ -154,45 +156,10 @@ export class MessageOperations {
           role,
           content,
         };
-      }) || []
-    );
-  }
-
-  static async getFirstMessageForTeamAndLevel(
-    teamId: string,
-    levelId: string
-  ): Promise<SharedMessage | null> {
-    const result = await docClient.send(
-      new QueryCommand({
-        TableName: DUCK_HUNT_TABLE_NAME,
-        IndexName: "GSI1",
-        KeyConditionExpression:
-          "GSI1PK = :gsi1pk AND begins_with(GSI1SK, :gsi1sk)",
-        // include soft deleted messages in query - used for time since first message
-        FilterExpression: "level_id = :levelId",
-        ExpressionAttributeValues: {
-          ":gsi1pk": `TEAM#${teamId}`,
-          ":gsi1sk": "MESSAGE#",
-          ":levelId": levelId,
-        },
-        Limit: 1,
-        ScanIndexForward: true, // oldest first
       })
+        // Sort by created_at (ms precision); the sort key is only 1-second granular.
+        .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))) || []
     );
-
-    console.log("INFO: Fetched first message for team at level:", result.Items);
-
-    if (!result.Items || result.Items.length === 0) {
-      console.warn(`No messages found for team ${teamId} at level ${levelId}.`);
-      return null;
-    }
-
-    const firstMessage = result.Items[0];
-    return {
-      id: firstMessage.id,
-      createdAt: firstMessage.created_at,
-      role: firstMessage.role,
-      content: firstMessage.content,
-    };
   }
+
 }

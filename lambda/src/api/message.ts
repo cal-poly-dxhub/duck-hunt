@@ -117,6 +117,7 @@ export const handler = async (
       userId: headers["user-id"] as UUID,
       teamId: headers["team-id"] as UUID,
       currentLevel,
+      startedAt: currentTeamLevel.started_at,
       userMessage: eventBody.message,
     });
   } catch (error) {

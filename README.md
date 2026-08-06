@@ -65,7 +65,10 @@ See `GAME_SETUP.md` for detailed game setup instructions.
 5. **AWS Account Requirements**
    - Active AWS account with appropriate permissions
    - IAM permissions for CDK, Lambda, DynamoDB, S3, API Gateway, CloudFront, and Bedrock
-   - Bedrock model access (Claude models) enabled in your AWS region
+   - Bedrock model access enabled in your AWS region for every model in
+     `shared/src/config.ts` (`levelModels`) — currently Google, Meta, Amazon, Z.AI and
+     Anthropic. A model that is not enabled falls back to a "technical difficulties"
+     message rather than failing loudly
 
 ## Setup
 

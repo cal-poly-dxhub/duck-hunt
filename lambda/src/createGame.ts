@@ -1,4 +1,5 @@
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { shuffle } from "@shared/scripts";
 import { S3Event } from "aws-lambda";
 import { v4 as uuidv4 } from "uuid";
 import { Game, GameOperations } from "./dynamo/game";
@@ -340,17 +341,16 @@ class GameCreationService {
       let teamLevels: any[] = [];
 
       if (levelsInGame === levels.length) {
-        // Team plays all levels in order
-        teamLevels = levels;
+        // All levels, shuffled per team, final level (last in config) kept last.
+        const shuffledLevels = shuffle(availableLevels);
+        teamLevels = [...shuffledLevels, finalLevel];
       } else {
         // Team gets a subset of levels plus the final level
         const levelsNeeded = levelsInGame - 1; // Subtract 1 for the final level
 
         if (levelsNeeded > 0) {
           // Randomly select levels from available levels (excluding final)
-          const shuffledLevels = [...availableLevels].sort(
-            () => Math.random() - 0.5
-          );
+          const shuffledLevels = shuffle(availableLevels);
           const selectedLevels = shuffledLevels.slice(0, levelsNeeded);
           teamLevels = [...selectedLevels, finalLevel];
         } else {
@@ -421,6 +421,35 @@ class GameCreationService {
       );
     });
 
+    console.log("");
+
+    // Build a per-team ordered route (which locations that team visits, in order).
+    const levelNameById = new Map(levels.map((l) => [l.id, l.levelName]));
+    const routeByTeam = new Map<
+      string,
+      { index: number; levelName: string }[]
+    >();
+    teamLevelAssignments.forEach((a) => {
+      const route = routeByTeam.get(a.teamId) || [];
+      route.push({
+        index: a.index,
+        levelName: levelNameById.get(a.levelId) || a.levelId,
+      });
+      routeByTeam.set(a.teamId, route);
+    });
+    // Sort each team's route by visit order.
+    routeByTeam.forEach((route) => route.sort((x, y) => x.index - y.index));
+
+    // Log human-readable per-team routes.
+    console.log("TEAM ROUTES:");
+    teams.forEach((team) => {
+      const route = routeByTeam.get(team.id) || [];
+      console.log(`team ${team.name} route:`);
+      route.forEach((stop, i) => {
+        console.log(`  ${i + 1}. ${stop.levelName}`);
+      });
+    });
+
     // now create a json object of all the data and log it
 
     const gameData = {
@@ -429,6 +458,10 @@ class GameCreationService {
         id: team.id,
         name: team.name,
         url: `${process.env.FRONTEND_CLOUDFRONT_URL}?team-id=${team.id}`,
+        route: (routeByTeam.get(team.id) || []).map((stop, i) => ({
+          order: i + 1,
+          levelName: stop.levelName,
+        })),
       })),
       levels: levels.map((level) => ({
         id: level.id,

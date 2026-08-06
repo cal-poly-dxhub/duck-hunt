@@ -42,7 +42,7 @@ export const handler = async (
   try {
     await fetchBaseData(headers);
 
-    CoordinateSnapshotOperations.create({
+    await CoordinateSnapshotOperations.create({
       user_id: headers["user-id"] as UUID,
       team_id: headers["team-id"] as UUID,
       latitude: eventBody.latitude,

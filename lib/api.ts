@@ -18,6 +18,11 @@ export class ApiResources extends Construct {
     // reference stack if needed
     const stack = cdk.Stack.of(this);
 
+    // Env vars shared by the API Lambdas.
+    const lambdaEnv = {
+      DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
+    };
+
     // api
     this.api = new cdk.aws_apigateway.RestApi(this, "PublicApi", {
       description: "API for frontend public requests",
@@ -54,9 +59,7 @@ export class ApiResources extends Construct {
         forceDockerBundling: false,
       },
       timeout: cdk.Duration.seconds(30),
-      environment: {
-        DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
-      },
+      environment: lambdaEnv,
       logGroup: new cdk.aws_logs.LogGroup(this, "MessageLogGroup", {
         logGroupName: `MessageLambdaLogGroup-${props.uniqueId}`,
         retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
@@ -66,7 +69,7 @@ export class ApiResources extends Construct {
     props.duckHuntTable.grantReadWriteData(messageLambda);
     messageLambda.addToRolePolicy(
       new cdk.aws_iam.PolicyStatement({
-        actions: ["bedrock:InvokeModel", "bedrock:ApplyGuardrail"],
+        actions: ["bedrock:InvokeModel"],
         resources: ["*"],
       }),
     );
@@ -87,9 +90,7 @@ export class ApiResources extends Construct {
         forceDockerBundling: false,
       },
       timeout: cdk.Duration.seconds(30),
-      environment: {
-        DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
-      },
+      environment: lambdaEnv,
       logGroup: new cdk.aws_logs.LogGroup(this, "LevelLogGroup", {
         logGroupName: `LevelLambdaLogGroup-${props.uniqueId}`,
         retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
@@ -99,7 +100,7 @@ export class ApiResources extends Construct {
     props.duckHuntTable.grantReadWriteData(levelLambda);
     levelLambda.addToRolePolicy(
       new cdk.aws_iam.PolicyStatement({
-        actions: ["bedrock:InvokeModel", "bedrock:ApplyGuardrail"],
+        actions: ["bedrock:InvokeModel"],
         resources: ["*"],
       }),
     );
@@ -120,9 +121,7 @@ export class ApiResources extends Construct {
         forceDockerBundling: false,
       },
       timeout: cdk.Duration.seconds(30),
-      environment: {
-        DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
-      },
+      environment: lambdaEnv,
       logGroup: new cdk.aws_logs.LogGroup(this, "ClearChatLogGroup", {
         logGroupName: `ClearChatLambdaLogGroup-${props.uniqueId}`,
         retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
@@ -132,7 +131,7 @@ export class ApiResources extends Construct {
     props.duckHuntTable.grantReadWriteData(clearChatLambda);
     clearChatLambda.addToRolePolicy(
       new cdk.aws_iam.PolicyStatement({
-        actions: ["bedrock:InvokeModel", "bedrock:ApplyGuardrail"],
+        actions: ["bedrock:InvokeModel"],
         resources: ["*"],
       }),
     );

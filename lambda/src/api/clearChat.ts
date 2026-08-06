@@ -98,6 +98,7 @@ export const handler = async (
       userId: headers["user-id"] as UUID,
       teamId: headers["team-id"] as UUID,
       currentLevel,
+      startedAt: currentTeamLevel.started_at,
       userMessage: {
         id: v4() as UUID,
         role: MessageRole.User,

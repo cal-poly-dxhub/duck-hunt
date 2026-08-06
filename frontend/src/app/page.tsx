@@ -14,6 +14,7 @@ import {
   TextInput,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
+import { frontendConfig } from "@shared/config";
 import { Message, MessageRole, UUID } from "@shared/types";
 import { IconSend, IconTrash, IconUpload } from "@tabler/icons-react";
 import { useSearchParams } from "next/navigation";
@@ -217,7 +218,7 @@ export default function Chat() {
   useEffect(() => {
     const interval = setInterval(() => {
       scavengerHuntApi.pingCoordinates();
-    }, 10000);
+    }, frontendConfig.coordinatePingIntervalMs);
 
     return () => clearInterval(interval);
   }, []);
