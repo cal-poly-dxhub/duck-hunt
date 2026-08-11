@@ -131,13 +131,10 @@ const invokeBedrock = async ({
     // treat it as a failed invocation → fallback, rather than leaking the
     // internal monologue.
     const contentBlocks = response.output?.message?.content ?? [];
-    let text: string | undefined;
-    for (const block of contentBlocks) {
-      if (block.text) {
-        text = block.text;
-        break;
-      }
-    }
+    const text = contentBlocks
+      .filter((block) => typeof block.text === "string")
+      .map((block) => block.text)
+      .join("");
     if (!text) {
       throw new Error(
         "Invalid response format from Bedrock Converse: no text block " +
