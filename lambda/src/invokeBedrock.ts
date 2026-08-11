@@ -1,22 +1,18 @@
 import {
-  ApplyGuardrailCommand,
   BedrockRuntimeClient,
-  InvokeModelCommand,
+  ConverseCommand,
 } from "@aws-sdk/client-bedrock-runtime";
+import { bedrockConfig, modelMinMaxTokens } from "@shared/config";
+import { stripReasoning } from "@shared/scripts";
 import { Message, MessageRole, UUID } from "@shared/types";
 import { v4 } from "uuid";
 import { LevelOperations } from "./dynamo/level";
 import { MessageOperations } from "./dynamo/message";
+import { TeamLevelOperations } from "./dynamo/teamLevel";
 
 const bedrockClient = new BedrockRuntimeClient({
   region: process.env.AWS_REGION || "us-west-2",
 });
-
-const MODEL_ID = "anthropic.claude-3-5-haiku-20241022-v1:0";
-
-// Guardrail configuration
-const GUARDRAIL_ID = process.env.GUARDRAIL_ID || "qi5egvtmehhe";
-const GUARDRAIL_VERSION = process.env.GUARDRAIL_VERSION || "DRAFT";
 
 export interface InvokeBedrockPersistToDynamoProps {
   userId: UUID;
@@ -28,75 +24,15 @@ export interface InvokeBedrockPersistToDynamoProps {
 
 export interface InvokeBedrockProps {
   levelId: UUID;
+  modelId: string;
   messageHistory: Array<Message>;
 }
 
 export interface InvokeBedrockResponse {
   bedrockResponseMessage: Message<MessageRole.Assistant>;
+  /** True when the response is a hardcoded fallback (model invocation failed). */
+  isFallback?: boolean;
 }
-
-/**
- * Apply guardrails to content
- */
-const applyGuardrails = async (
-  content: string,
-  source: "INPUT" | "OUTPUT"
-): Promise<{
-  isBlocked: boolean;
-  filteredContent?: string;
-  reason?: string;
-}> => {
-  // Skip guardrail check if not configured
-  if (!GUARDRAIL_ID) {
-    console.warn("Guardrail ID not configured, skipping guardrail check");
-    return { isBlocked: false, filteredContent: content };
-  }
-
-  try {
-    const command = new ApplyGuardrailCommand({
-      guardrailIdentifier: GUARDRAIL_ID,
-      guardrailVersion: GUARDRAIL_VERSION,
-      source: source,
-      content: [
-        {
-          text: {
-            text: content,
-          },
-        },
-      ],
-    });
-
-    const response = await bedrockClient.send(command);
-
-    // Check if content was blocked
-    const isBlocked = response.action === "GUARDRAIL_INTERVENED";
-
-    if (isBlocked) {
-      console.log(
-        `Guardrail blocked ${source.toLowerCase()} content:`,
-        response.actionReason
-      );
-      return {
-        isBlocked: true,
-        reason:
-          response.actionReason || "Content blocked by guardrail policies",
-      };
-    }
-
-    // Get filtered content if available
-    const filteredContent = response.outputs?.[0]?.text || content;
-
-    console.log(`Guardrail approved ${source.toLowerCase()} content`);
-    return { isBlocked: false, filteredContent };
-  } catch (error) {
-    console.error(
-      `Error applying guardrails to ${source.toLowerCase()} content:`,
-      error
-    );
-    // Don't block content if guardrail check fails - log and continue
-    return { isBlocked: false, filteredContent: content };
-  }
-};
 
 /**
  * Build a comprehensive system prompt using level data
@@ -134,10 +70,14 @@ const buildSystemPrompt = (levelData: any): string => {
 };
 
 /**
- * Invoke bedrock with message history and system prompt from s3
+ * Invoke a Bedrock model via the Converse API. Converse normalizes the
+ * request/response shape across model providers, so the same code path works
+ * for the mixed per-level model set (Anthropic, Meta, OpenAI-OSS, Z.ai,
+ * Amazon Nova, ...).
  */
 const invokeBedrock = async ({
   levelId,
+  modelId,
   messageHistory,
 }: InvokeBedrockProps): Promise<InvokeBedrockResponse> => {
   const nextMessageId = v4() as UUID;
@@ -146,107 +86,85 @@ const invokeBedrock = async ({
     const levelData = await LevelOperations.getByLevelId(levelId);
 
     if (!levelData) {
-      // TODO: Return a clue from dynamo if level not found
       throw new Error(`Level not found for ID: ${levelId}`);
     }
 
     const systemPrompt = buildSystemPrompt(levelData);
-    const maxTokens = levelData.max_tokens || 512;
+    // Raise to the model's floor: reasoning models truncate before emitting text at 512.
+    const maxTokens = Math.max(
+      levelData.max_tokens || bedrockConfig.defaultMaxTokens,
+      modelMinMaxTokens[modelId] ?? 0
+    );
 
-    const messages = messageHistory.map((msg) => ({
-      role: msg.role === MessageRole.User ? "user" : "assistant",
-      content: msg.content,
+    // Converse expects messages as { role, content: [{ text }] }.
+    let messages = messageHistory.map((msg) => ({
+      role: (msg.role === MessageRole.User ? "user" : "assistant") as
+        | "user"
+        | "assistant",
+      content: [{ text: msg.content }],
     }));
 
-    const requestBody = {
-      anthropic_version: "bedrock-2023-05-31",
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: messages,
-      temperature: 0.7,
-    };
+    // Some models (e.g. Meta Llama 3) strictly require the conversation to
+    // START with a user message and reject a leading assistant turn with
+    // "A conversation must start with a user message." Drop any leading
+    // assistant message(s) so history always begins with a user turn.
+    while (messages.length > 0 && messages[0].role === "assistant") {
+      messages = messages.slice(1);
+    }
 
-    const command = new InvokeModelCommand({
-      modelId: MODEL_ID,
-      body: JSON.stringify(requestBody),
-      contentType: "application/json",
-      accept: "application/json",
+    const command = new ConverseCommand({
+      modelId,
+      system: [{ text: systemPrompt }],
+      messages,
+      inferenceConfig: {
+        maxTokens,
+        temperature: bedrockConfig.temperature,
+      },
     });
 
     const response = await bedrockClient.send(command);
 
-    if (!response.body) {
-      throw new Error("No response body from Bedrock");
+    // Extract only response text and hide reasoning from players; fail if there is no response text.
+    const contentBlocks = response.output?.message?.content ?? [];
+    const text = contentBlocks
+      .filter((block) => typeof block.text === "string")
+      .map((block) => block.text)
+      .join("");
+    if (!text) {
+      throw new Error(
+        "Invalid response format from Bedrock Converse: no text block " +
+          "(model may have returned only reasoning or been truncated)"
+      );
     }
 
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-
-    if (
-      !responseBody.content ||
-      !responseBody.content[0] ||
-      !responseBody.content[0].text
-    ) {
-      throw new Error("Invalid response format from Bedrock");
+    // Strip inline <think> reasoning; nothing left means it was cut off mid-thought, so fall back.
+    const cleanedText = stripReasoning(text);
+    if (!cleanedText) {
+      throw new Error(
+        "Model returned only reasoning with no final answer (possibly truncated)"
+      );
     }
 
     const responseMessage: Message<MessageRole.Assistant> = {
       id: nextMessageId,
       role: MessageRole.Assistant,
-      content: responseBody.content[0].text,
+      content: cleanedText,
       createdAt: new Date(),
     };
 
     console.log(
-      `INFO: Successfully invoked Bedrock for level ${levelId} with character: ${levelData.character.name}`
+      `INFO: Successfully invoked ${modelId} for level ${levelId} with character: ${levelData.character.name}`
     );
-
-    // Apply guardrails to the LLM response
-    const guardrailCheck = await applyGuardrails(
-      responseMessage.content,
-      "OUTPUT"
-    );
-
-    if (guardrailCheck.isBlocked) {
-      console.log(
-        `INFO: LLM response blocked by guardrails for level ${levelId}:`,
-        guardrailCheck.reason
-      );
-
-      // Return a safe fallback message
-      const safeResponseMessage: Message<MessageRole.Assistant> = {
-        id: nextMessageId,
-        role: MessageRole.Assistant,
-        content:
-          "I'm sorry, but I can't provide that response. Let me help you with your scavenger hunt in a different way.",
-        createdAt: new Date(),
-      };
-
-      return {
-        bedrockResponseMessage: safeResponseMessage,
-      };
-    }
-
-    // Use filtered content if available
-    if (
-      guardrailCheck.filteredContent &&
-      guardrailCheck.filteredContent !== responseMessage.content
-    ) {
-      responseMessage.content = guardrailCheck.filteredContent;
-      console.log(
-        `INFO: LLM response content filtered by guardrails for level ${levelId}`
-      );
-    }
 
     return {
       bedrockResponseMessage: responseMessage,
     };
   } catch (error) {
     console.error(
-      `ERROR: Bedrock invocation failed for level ${levelId}:`,
+      `ERROR: Bedrock invocation failed for level ${levelId} (model ${modelId}):`,
       error
     );
 
-    // TODO: If dynamo error, return hardcoded response
     const fallbackMessage: Message<MessageRole.Assistant> = {
       id: nextMessageId,
       role: MessageRole.Assistant,
@@ -257,6 +175,7 @@ const invokeBedrock = async ({
 
     return {
       bedrockResponseMessage: fallbackMessage,
+      isFallback: true,
     };
   }
 };
@@ -269,43 +188,9 @@ export const invokeBedrockPersistToDynamo = async ({
   newUserMessage,
 }: InvokeBedrockPersistToDynamoProps): Promise<InvokeBedrockResponse> => {
   try {
-    // Apply guardrails to user input first
-    const userInputGuardrailCheck = await applyGuardrails(
-      newUserMessage.content,
-      "INPUT"
-    );
-
-    if (userInputGuardrailCheck.isBlocked) {
-      console.log(
-        `INFO: User message blocked by guardrails for level ${levelId}:`,
-        userInputGuardrailCheck.reason
-      );
-
-      // Return a response indicating the message was blocked
-      const blockedResponseMessage: Message<MessageRole.Assistant> = {
-        id: v4() as UUID,
-        role: MessageRole.Assistant,
-        content:
-          "I can't process that message due to content policies. Please rephrase your question or comment, and I'll be happy to help with your scavenger hunt!",
-        createdAt: new Date(),
-      };
-
-      return {
-        bedrockResponseMessage: blockedResponseMessage,
-      };
-    }
-
-    // Use filtered content if available
-    let processedUserMessage = { ...newUserMessage };
-    if (
-      userInputGuardrailCheck.filteredContent &&
-      userInputGuardrailCheck.filteredContent !== newUserMessage.content
-    ) {
-      processedUserMessage.content = userInputGuardrailCheck.filteredContent;
-      console.log(
-        `INFO: User message content filtered by guardrails for level ${levelId}`
-      );
-    }
+    // Fixed model per level position (same mapping for all teams). Resolved
+    // from the team's route order; self-falls back internally on any error.
+    const modelId = await TeamLevelOperations.getModelForLevel(teamId, levelId);
 
     // Get existing message history from DynamoDB
     let messageHistory: Array<Message> = [];
@@ -323,17 +208,17 @@ export const invokeBedrockPersistToDynamo = async ({
       // Continue with empty message history
     }
 
-    // Persist new user message to DynamoDB (use original content for storage)
+    // Persist new user message to DynamoDB
     try {
       await MessageOperations.create({
         game_id: gameId,
         user_id: userId,
         team_id: teamId,
         level_id: levelId,
-        content: newUserMessage.content, // Store original user content
+        content: newUserMessage.content,
         role: newUserMessage.role,
       });
-      messageHistory.push(processedUserMessage); // Use filtered content for LLM
+      messageHistory.push(newUserMessage);
 
       console.log(`INFO: Persisted user message for level ${levelId}`);
     } catch (error) {
@@ -341,16 +226,17 @@ export const invokeBedrockPersistToDynamo = async ({
         `ERROR: Failed to persist user message for level ${levelId}:`,
         error
       );
-      // Continue anyway - we'll still try to get a response from Bedrock
+      // Continue anyway - we'll still try to get a response from the model
     }
 
-    // Invoke Bedrock with the message history (including filtered user message)
-    const { bedrockResponseMessage } = await invokeBedrock({
+    // Invoke the team's model with the message history
+    const { bedrockResponseMessage, isFallback } = await invokeBedrock({
       levelId,
+      modelId,
       messageHistory,
     });
 
-    // Persist Bedrock's response message to DynamoDB (regardless of whether it failed)
+    // Persist even fallbacks: an unpersisted reply leaves consecutive user turns, which Converse rejects.
     try {
       await MessageOperations.create({
         game_id: gameId,
@@ -359,16 +245,16 @@ export const invokeBedrockPersistToDynamo = async ({
         level_id: levelId,
         content: bedrockResponseMessage.content,
         role: bedrockResponseMessage.role,
+        ...(isFallback ? { is_fallback: true } : {}),
       });
       console.log(
-        `INFO: Persisted Bedrock response message for level ${levelId}`
+        `INFO: Persisted model response message for level ${levelId}`
       );
     } catch (error) {
       console.error(
-        `ERROR: Failed to persist Bedrock response message for level ${levelId}:`,
+        `ERROR: Failed to persist model response message for level ${levelId}:`,
         error
       );
-      // Don't fail the entire operation if we can't persist the response
     }
 
     return { bedrockResponseMessage };

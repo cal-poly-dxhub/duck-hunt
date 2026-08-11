@@ -18,6 +18,8 @@ export interface Game extends BaseEntity {
   levelsInGame?: number;
   teams: Array<Team>;
   levels: Array<Level>;
+  /** Team id of the first team to complete the hunt (set atomically, once). */
+  winner_team_id?: string;
 }
 
 // GAME Operations
@@ -99,6 +101,41 @@ export class GameOperations {
 
     const { PK, SK, ItemType, ...game } = result.Attributes!;
     return game as Game;
+  }
+
+  /** Atomically claim the winner slot. Returns the winning team id, idempotently. */
+  static async claimWinner(
+    gameId: string,
+    teamId: string
+  ): Promise<string | null> {
+    try {
+      const result = await docClient.send(
+        new UpdateCommand({
+          TableName: DUCK_HUNT_TABLE_NAME,
+          Key: { PK: `GAME#${gameId}`, SK: "#METADATA" },
+          UpdateExpression:
+            "SET winner_team_id = :teamId, updated_at = :updatedAt",
+          ConditionExpression: "attribute_not_exists(winner_team_id)",
+          ExpressionAttributeValues: {
+            ":teamId": teamId,
+            ":updatedAt": getCurrentTimestamp(),
+          },
+          ReturnValues: "ALL_NEW",
+          ReturnValuesOnConditionCheckFailure: "ALL_OLD",
+        })
+      );
+      console.log(`INFO: Team ${teamId} WON game ${gameId}`);
+      return (result.Attributes?.winner_team_id as string) ?? null;
+    } catch (error: any) {
+      // Someone already won: read them off the failed condition, no second query.
+      if (error?.name === "ConditionalCheckFailedException") {
+        const existing = error?.Item?.winner_team_id;
+        const winner =
+          typeof existing === "string" ? existing : existing?.S ?? null;
+        return winner ?? (await this.getById(gameId))?.winner_team_id ?? null;
+      }
+      throw error;
+    }
   }
 
   static async delete(gameId: string): Promise<void> {

@@ -84,16 +84,28 @@ export const fetchBaseData = async (
     };
   }
 
+  // Skip once set: the conditional write would fail on every ping (10s) for no gain.
+  if (!currentTeamLevel.completed_at && !currentTeamLevel.started_at) {
+    // Mirror only a winning write; on a lost race leave it unset so the next request reads the real value.
+    const startedAt = await TeamLevelOperations.markLevelAsStarted(
+      headers["team-id"] as UUID,
+      currentTeamLevel.level_id as UUID
+    );
+    if (startedAt) {
+      currentTeamLevel.started_at = startedAt;
+    }
+  }
+
   let currentUser = await UserOperations.getById(headers["user-id"] as UUID);
 
   if (!currentUser) {
-    UserOperations.create({
+    // Must await: a new user's first request previously failed because the
+    // create had not landed before the re-read below (worked on refresh).
+    currentUser = await UserOperations.create({
       id: headers["user-id"] as UUID,
       team_id: headers["team-id"] as UUID,
     });
   }
-
-  currentUser = await UserOperations.getById(headers["user-id"] as UUID);
 
   if (!currentUser) {
     console.error("ERROR: User not found for user-id:", headers["user-id"]);

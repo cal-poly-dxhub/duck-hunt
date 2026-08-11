@@ -41,6 +41,10 @@ jobs:
       - name: Typecheck CDK app
         run: yarn build
 
+      # Root tsconfig excludes lambda/; esbuild bundling does not check types.
+      - name: Typecheck Lambda and shared
+        run: npx tsc -p lambda/tsconfig.json --noEmit
+
       - name: Run tests
         run: yarn test
 

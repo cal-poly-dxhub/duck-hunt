@@ -1,3 +1,4 @@
+import { levelTimeConfig } from "@shared/config";
 import {
   corsHeaders,
   MessageResponseBody,
@@ -7,7 +8,6 @@ import {
 import { APIGatewayProxyResult } from "aws-lambda";
 import { v4 } from "uuid";
 import { Level } from "./dynamo/level";
-import { MessageOperations } from "./dynamo/message";
 import { invokeBedrockPersistToDynamo } from "./invokeBedrock";
 
 export interface RespondByLevelTimeProps {
@@ -15,6 +15,8 @@ export interface RespondByLevelTimeProps {
   userId: UUID;
   teamId: UUID;
   currentLevel: Level;
+  /** TEAM_LEVEL.started_at for the current level; required so callers can't silently omit it. */
+  startedAt: string | undefined;
   userMessage: {
     id: UUID;
     role: MessageRole.User;
@@ -25,7 +27,7 @@ export interface RespondByLevelTimeProps {
 
 /**
  * Respond to the user based on the time spent on the current level.
- * Uses the first message for the team at the current level to determine how long the team has been on the level.
+ * Uses the team's started_at for the current level to determine how long the team has been on the level.
  * @param param0 {RespondByLevelTimeProps}
  * @returns {Promise<APIGatewayProxyResult>}
  */
@@ -34,6 +36,7 @@ export const respondByLevelTime = async ({
   userId,
   teamId,
   currentLevel,
+  startedAt,
   userMessage,
 }: RespondByLevelTimeProps): Promise<APIGatewayProxyResult> => {
   console.log("INFO: Responding by level time (message response) with:", {
@@ -43,32 +46,20 @@ export const respondByLevelTime = async ({
     currentLevel,
   });
 
-  const firstTeamMessageForCurrentLevel =
-    await MessageOperations.getFirstMessageForTeamAndLevel(
-      teamId,
-      currentLevel.id as UUID
-    );
-
-  const minutesOnLevel = firstTeamMessageForCurrentLevel
-    ? Math.floor(
-        (Date.now() -
-          new Date(firstTeamMessageForCurrentLevel.createdAt).getTime()) /
-          (60 * 1000)
-      )
+  // started_at, not the first message: that query pairs Limit 1 with a filter, so it returns null past level 1.
+  const minutesOnLevel = startedAt
+    ? Math.floor((Date.now() - new Date(startedAt).getTime()) / (60 * 1000))
     : 0;
-
-  console.log(
-    "INFO: First team message for current level:",
-    firstTeamMessageForCurrentLevel
-  );
 
   console.log("INFO: Minutes on level:", minutesOnLevel);
 
-  if (minutesOnLevel < 10) {
-    if (!firstTeamMessageForCurrentLevel) {
-      console.warn("WARN: No messages found for team at current level.");
+  if (minutesOnLevel < levelTimeConfig.easyClueThresholdMin) {
+    if (!startedAt) {
+      console.warn("WARN: No started_at recorded for team at current level.");
     } else {
-      console.log("INFO: User has been on the level for less than 10 minutes.");
+      console.log(
+        `INFO: User has been on the level for less than ${levelTimeConfig.easyClueThresholdMin} minutes.`
+      );
     }
 
     // been on level for <10 minutes
@@ -93,9 +84,12 @@ export const respondByLevelTime = async ({
         mapLink: null,
       } as MessageResponseBody),
     };
-  } else if (minutesOnLevel > 10 && minutesOnLevel <= 15) {
+  } else if (
+    minutesOnLevel > levelTimeConfig.easyClueThresholdMin &&
+    minutesOnLevel <= levelTimeConfig.mapLinkThresholdMin
+  ) {
     console.warn(
-      "WARN: User has been on the level for more than 10 minutes (<15 minutes)."
+      `WARN: User has been on the level for more than ${levelTimeConfig.easyClueThresholdMin} minutes (<${levelTimeConfig.mapLinkThresholdMin} minutes).`
     );
 
     // Pick a random easy clue from currentLevel.easyClues
@@ -116,8 +110,10 @@ export const respondByLevelTime = async ({
       } as MessageResponseBody),
     };
   } else {
-    // been on level for >15 minutes
-    console.warn("WARN: User has been on the level for more than 15 minutes.");
+    // been on level for > mapLinkThresholdMin minutes
+    console.warn(
+      `WARN: User has been on the level for more than ${levelTimeConfig.mapLinkThresholdMin} minutes.`
+    );
 
     return {
       statusCode: 200,

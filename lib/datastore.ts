@@ -28,8 +28,16 @@ export class DatastoreResources extends Construct {
           type: dynamodb.AttributeType.STRING,
         },
         removalPolicy: props.removalPolicy ?? cdk.RemovalPolicy.DESTROY,
+        // Off so the table tears down with the stack.
+        deletionProtection: false,
+        // 35-day restore window: teardown stays clean, but gameplay data is recoverable.
+        pointInTimeRecoverySpecification: {
+          pointInTimeRecoveryEnabled: true,
+        },
         tableName: `ScavengerHuntData-${props.uniqueId}`,
         timeToLiveAttribute: "ttl", // not used, but deleted_at is not longer ttl
+        // On-demand: throughput scales with concurrent play.
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       }
     );
 

@@ -1,6 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
+import { bedrockConfig, levelModels } from "../shared/src/config";
 
 export interface ApiResourcesProps {
   uniqueId: string;
@@ -8,6 +9,34 @@ export interface ApiResourcesProps {
   duckHuntTable: cdk.aws_dynamodb.Table;
   photoBucket: cdk.aws_s3.Bucket;
 }
+
+// Region-prefixed ids (us.*, eu.*, ...) are cross-region inference profiles, not plain models.
+const INFERENCE_PROFILE_PREFIX = /^(us|eu|apac|jp|au|ca|sa|global)\./;
+
+/**
+ * Least-privilege resources for bedrock:InvokeModel: exactly the models in
+ * levelModels plus the fallback. A cross-region inference profile needs both the
+ * profile ARN and the underlying foundation model in every destination region.
+ */
+const bedrockModelArns = (stack: cdk.Stack): string[] => {
+  const modelIds = Array.from(
+    new Set<string>([...levelModels, bedrockConfig.fallbackModelId])
+  );
+
+  return modelIds.flatMap((modelId) =>
+    INFERENCE_PROFILE_PREFIX.test(modelId)
+      ? [
+          `arn:${cdk.Aws.PARTITION}:bedrock:${stack.region}:${stack.account}:inference-profile/${modelId}`,
+          `arn:${cdk.Aws.PARTITION}:bedrock:*::foundation-model/${modelId.replace(
+            INFERENCE_PROFILE_PREFIX,
+            ""
+          )}`,
+        ]
+      : [
+          `arn:${cdk.Aws.PARTITION}:bedrock:${stack.region}::foundation-model/${modelId}`,
+        ]
+  );
+};
 
 export class ApiResources extends Construct {
   public readonly api: cdk.aws_apigateway.RestApi;
@@ -17,6 +46,14 @@ export class ApiResources extends Construct {
 
     // reference stack if needed
     const stack = cdk.Stack.of(this);
+
+    // Only the models in levelModels — see bedrockModelArns.
+    const bedrockArns = bedrockModelArns(stack);
+
+    // Env vars shared by the API Lambdas.
+    const lambdaEnv = {
+      DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
+    };
 
     // api
     this.api = new cdk.aws_apigateway.RestApi(this, "PublicApi", {
@@ -54,9 +91,7 @@ export class ApiResources extends Construct {
         forceDockerBundling: false,
       },
       timeout: cdk.Duration.seconds(30),
-      environment: {
-        DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
-      },
+      environment: lambdaEnv,
       logGroup: new cdk.aws_logs.LogGroup(this, "MessageLogGroup", {
         logGroupName: `MessageLambdaLogGroup-${props.uniqueId}`,
         retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
@@ -66,8 +101,8 @@ export class ApiResources extends Construct {
     props.duckHuntTable.grantReadWriteData(messageLambda);
     messageLambda.addToRolePolicy(
       new cdk.aws_iam.PolicyStatement({
-        actions: ["bedrock:InvokeModel", "bedrock:ApplyGuardrail"],
-        resources: ["*"],
+        actions: ["bedrock:InvokeModel"],
+        resources: bedrockArns,
       }),
     );
     const messageLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
@@ -87,9 +122,7 @@ export class ApiResources extends Construct {
         forceDockerBundling: false,
       },
       timeout: cdk.Duration.seconds(30),
-      environment: {
-        DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
-      },
+      environment: lambdaEnv,
       logGroup: new cdk.aws_logs.LogGroup(this, "LevelLogGroup", {
         logGroupName: `LevelLambdaLogGroup-${props.uniqueId}`,
         retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
@@ -99,8 +132,8 @@ export class ApiResources extends Construct {
     props.duckHuntTable.grantReadWriteData(levelLambda);
     levelLambda.addToRolePolicy(
       new cdk.aws_iam.PolicyStatement({
-        actions: ["bedrock:InvokeModel", "bedrock:ApplyGuardrail"],
-        resources: ["*"],
+        actions: ["bedrock:InvokeModel"],
+        resources: bedrockArns,
       }),
     );
     const levelLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(
@@ -120,9 +153,7 @@ export class ApiResources extends Construct {
         forceDockerBundling: false,
       },
       timeout: cdk.Duration.seconds(30),
-      environment: {
-        DUCK_HUNT_TABLE_NAME: props.duckHuntTable.tableName,
-      },
+      environment: lambdaEnv,
       logGroup: new cdk.aws_logs.LogGroup(this, "ClearChatLogGroup", {
         logGroupName: `ClearChatLambdaLogGroup-${props.uniqueId}`,
         retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
@@ -132,8 +163,8 @@ export class ApiResources extends Construct {
     props.duckHuntTable.grantReadWriteData(clearChatLambda);
     clearChatLambda.addToRolePolicy(
       new cdk.aws_iam.PolicyStatement({
-        actions: ["bedrock:InvokeModel", "bedrock:ApplyGuardrail"],
-        resources: ["*"],
+        actions: ["bedrock:InvokeModel"],
+        resources: bedrockArns,
       }),
     );
     const clearChatLambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(

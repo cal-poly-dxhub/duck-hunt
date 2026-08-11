@@ -54,6 +54,53 @@ export class PhotoOperations {
     return photo;
   }
 
+  /** Team-scoped: GSI3 is level-only, so another team's photo would satisfy this team's gate. */
+  static async getByTeamAndLevel(
+    teamId: string,
+    levelId: string
+  ): Promise<Photo[]> {
+    const result = await docClient.send(
+      new QueryCommand({
+        TableName: DUCK_HUNT_TABLE_NAME,
+        IndexName: "GSI1",
+        KeyConditionExpression:
+          "GSI1PK = :gsi1pk AND begins_with(GSI1SK, :gsi1sk)",
+        FilterExpression: "level_id = :levelId",
+        ExpressionAttributeValues: {
+          ":gsi1pk": `TEAM#${teamId}`,
+          ":gsi1sk": "PHOTO#",
+          ":levelId": levelId,
+        },
+        ScanIndexForward: false,
+      })
+    );
+
+    console.log(
+      "INFO: Retrieved photos for team at level:",
+      teamId,
+      levelId,
+      result.Items?.length ?? 0
+    );
+
+    return (
+      result.Items?.map((item) => {
+        const {
+          PK,
+          SK,
+          GSI1PK,
+          GSI1SK,
+          GSI2PK,
+          GSI2SK,
+          GSI3PK,
+          GSI3SK,
+          ItemType,
+          ...photo
+        } = item;
+        return photo as Photo;
+      }) || []
+    );
+  }
+
   static async getByLevelId(levelId: string, limit?: number): Promise<Photo[]> {
     const result = await docClient.send(
       new QueryCommand({

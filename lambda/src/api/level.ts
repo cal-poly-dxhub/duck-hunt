@@ -1,3 +1,4 @@
+import { levelTimeConfig } from "@shared/config";
 import {
   corsHeaders,
   LevelResponseBody,
@@ -8,6 +9,7 @@ import {
   UUID,
 } from "@shared/types";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import { GameOperations } from "src/dynamo/game";
 import { Level } from "src/dynamo/level";
 import { MessageOperations } from "src/dynamo/message";
 import { PhotoOperations } from "src/dynamo/photo";
@@ -47,35 +49,19 @@ const respondByLevelTimeLevelResponse = async ({
     currentLevel,
   });
 
-  const firstTeamMessageForCurrentLevel =
-    await MessageOperations.getFirstMessageForTeamAndLevel(
-      teamId,
-      currentLevel.id as UUID
-    );
-
-  const minutesOnLevel = firstTeamMessageForCurrentLevel
+  // started_at, not the first message: that query pairs Limit 1 with a filter, so it returns null past level 1.
+  const minutesOnLevel = currentTeamLevel.started_at
     ? Math.floor(
-        (Date.now() -
-          new Date(firstTeamMessageForCurrentLevel.createdAt).getTime()) /
+        (Date.now() - new Date(currentTeamLevel.started_at).getTime()) /
           (60 * 1000)
       )
     : 0;
 
-  console.log(
-    "INFO: First team message for current level:",
-    firstTeamMessageForCurrentLevel
-  );
-
   console.log("INFO: Minutes on level:", minutesOnLevel);
-  if (minutesOnLevel < 10) {
-    if (!firstTeamMessageForCurrentLevel) {
-      console.warn("WARN: No messages found for team at current level.");
+  if (minutesOnLevel < levelTimeConfig.easyClueThresholdMin) {
+    if (!currentTeamLevel.started_at) {
+      console.warn("WARN: No started_at recorded for team at current level.");
     } else {
-      const minutesOnLevel = Math.floor(
-        (Date.now() -
-          new Date(firstTeamMessageForCurrentLevel.createdAt).getTime()) /
-          (60 * 1000)
-      );
       console.log(
         "INFO: Team has been on level for:",
         minutesOnLevel,
@@ -135,10 +121,13 @@ const respondByLevelTimeLevelResponse = async ({
       headers: corsHeaders,
       body: JSON.stringify(levelResponse),
     };
-  } else if (minutesOnLevel > 10 && minutesOnLevel <= 15) {
-    // been on level for >10 minutes, <15 minutes
+  } else if (
+    minutesOnLevel > levelTimeConfig.easyClueThresholdMin &&
+    minutesOnLevel <= levelTimeConfig.mapLinkThresholdMin
+  ) {
+    // been on level for > easyClueThresholdMin, <= mapLinkThresholdMin minutes
     console.warn(
-      "WARN: User has been on the level for more than 10 minutes (<15 minutes)."
+      `WARN: User has been on the level for more than ${levelTimeConfig.easyClueThresholdMin} minutes (<${levelTimeConfig.mapLinkThresholdMin} minutes).`
     );
 
     // Pick a random easy clue from currentLevel.easyClues
@@ -166,8 +155,10 @@ const respondByLevelTimeLevelResponse = async ({
       body: JSON.stringify(easyClueLevelResponse),
     };
   } else {
-    // been on level for >15 minutes
-    console.warn("WARN: User has been on the level for more than 15 minutes.");
+    // been on level for > mapLinkThresholdMin minutes
+    console.warn(
+      `WARN: User has been on the level for more than ${levelTimeConfig.mapLinkThresholdMin} minutes.`
+    );
 
     const hardMessage: Message<MessageRole.Assistant> = {
       id: v4() as UUID,
@@ -227,6 +218,14 @@ export const handler = async (
         "INFO: Current team level is already completed, returning completion message."
       );
 
+      // Claim-or-read: the conditional write no-ops once a winner exists, so this returns the recorded winner.
+      const winnerTeamId = await GameOperations.claimWinner(
+        gameId,
+        headers["team-id"] as UUID
+      );
+      const endScreen =
+        winnerTeamId === headers["team-id"] ? "win" : "finish";
+
       const messageResponse: LevelResponseBody = {
         currentTeamLevel: currentTeamLevel.id as UUID,
         messageHistory: [
@@ -239,6 +238,7 @@ export const handler = async (
         ],
         requiresPhoto: false,
         mapLink: null,
+        endScreen,
       };
 
       return {
@@ -261,9 +261,8 @@ export const handler = async (
       console.log("INFO: All team levels:", allTeamLevels);
 
       // check if photo from previous level is in database
-      const sortedTeamLevels = allTeamLevels.sort((a, b) =>
-        a.level_id.localeCompare(b.level_id)
-      );
+      // index is play order; level_id is a UUID and sorts arbitrarily.
+      const sortedTeamLevels = allTeamLevels.sort((a, b) => a.index - b.index);
       const completedTeamLevels = sortedTeamLevels.filter(
         (level) => level.completed_at !== undefined
       );
@@ -277,7 +276,8 @@ export const handler = async (
           completedTeamLevels[completedTeamLevels.length - 1].level_id
         );
 
-        const photos = await PhotoOperations.getByLevelId(
+        const photos = await PhotoOperations.getByTeamAndLevel(
+          headers["team-id"] as UUID,
           completedTeamLevels[completedTeamLevels.length - 1].level_id
         );
 
@@ -346,6 +346,15 @@ export const handler = async (
           headers["team-id"]
         );
 
+        // Team just finished the hunt. Atomically claim the winner slot: the
+        // first team to reach here wins; everyone else gets the finish screen.
+        const winnerTeamId = await GameOperations.claimWinner(
+          gameId,
+          headers["team-id"] as UUID
+        );
+        const endScreen =
+          winnerTeamId === headers["team-id"] ? "win" : "finish";
+
         return {
           statusCode: 202,
           headers: corsHeaders,
@@ -360,14 +369,16 @@ export const handler = async (
             ],
             currentTeamLevel: currentTeamLevel.id as UUID,
             requiresPhoto: true,
+            endScreen,
           } as LevelResponseBody),
         };
       }
 
       // otherwise, more levels to go
+      // TeamLevel.id is the join row, not the level.
       const newCurrentUserMessages = await MessageOperations.getForUserAtLevel(
         headers["user-id"] as UUID,
-        newCurrentLevel.id as UUID
+        newCurrentLevel.level_id as UUID
       );
 
       console.log(
@@ -405,7 +416,7 @@ export const handler = async (
 
       const { bedrockResponseMessage } = await invokeBedrockPersistToDynamo({
         gameId: gameId,
-        levelId: newCurrentLevel.id as UUID,
+        levelId: newCurrentLevel.level_id as UUID,
         userId: headers["user-id"] as UUID,
         teamId: headers["team-id"] as UUID,
         newUserMessage,
@@ -425,9 +436,8 @@ export const handler = async (
       const allTeamLevels = await TeamLevelOperations.getAllForTeam(
         headers["team-id"] as UUID
       );
-      const sortedTeamLevels = allTeamLevels.sort((a, b) =>
-        a.level_id.localeCompare(b.level_id)
-      );
+      // index is play order; level_id is a UUID and sorts arbitrarily.
+      const sortedTeamLevels = allTeamLevels.sort((a, b) => a.index - b.index);
       const completedTeamLevels = sortedTeamLevels.filter(
         (level) => level.completed_at !== undefined
       );

@@ -1,4 +1,10 @@
-import { PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
+import { bedrockConfig, levelModels } from "@shared/config";
 import { v4 as uuidv4 } from "uuid";
 import {
   BaseEntity,
@@ -11,6 +17,8 @@ export interface TeamLevel extends BaseEntity {
   team_id: string;
   level_id: string;
   index: number;
+  /** ISO timestamp of when the team first arrived at / interacted with this level. */
+  started_at?: string;
   completed_at?: string;
 }
 
@@ -129,6 +137,82 @@ export class TeamLevelOperations {
         },
       })
     );
+  }
+
+  /** Record first arrival at a level. Returns the timestamp set, or null if another request set it first. */
+  static async markLevelAsStarted(
+    teamId: string,
+    levelId: string
+  ): Promise<string | null> {
+    const currentTimestamp = getCurrentTimestamp();
+
+    try {
+      await docClient.send(
+        new UpdateCommand({
+          TableName: DUCK_HUNT_TABLE_NAME,
+          Key: {
+            PK: `TEAM#${teamId}`,
+            SK: `LEVEL#${levelId}`,
+          },
+          UpdateExpression:
+            "SET started_at = :startedAt, updated_at = :updatedAt",
+          ConditionExpression: "attribute_not_exists(started_at)",
+          ExpressionAttributeValues: {
+            ":startedAt": currentTimestamp,
+            ":updatedAt": currentTimestamp,
+          },
+        })
+      );
+      console.log(
+        `INFO: Marked level ${levelId} as started for team ${teamId} at ${currentTimestamp}`
+      );
+      return currentTimestamp;
+    } catch (error: any) {
+      // Already started — expected on every call after the first. Not an error.
+      if (error?.name !== "ConditionalCheckFailedException") {
+        console.error(
+          `ERROR: Failed to mark level ${levelId} started for team ${teamId}:`,
+          error
+        );
+      }
+      return null;
+    }
+  }
+
+  /** Model for this level's route position (TEAM_LEVEL.index -> levelModels). */
+  static async getModelForLevel(
+    teamId: string,
+    levelId: string
+  ): Promise<string> {
+    try {
+      const result = await docClient.send(
+        new GetCommand({
+          TableName: DUCK_HUNT_TABLE_NAME,
+          Key: { PK: `TEAM#${teamId}`, SK: `LEVEL#${levelId}` },
+        })
+      );
+
+      const index = result.Item?.index as number | undefined;
+
+      if (typeof index !== "number" || !levelModels[index]) {
+        console.warn(
+          `WARN: No model mapping for team ${teamId} level ${levelId} (index ${index}); using fallback.`
+        );
+        return bedrockConfig.fallbackModelId;
+      }
+
+      const model = levelModels[index];
+      console.log(
+        `INFO: Using model ${model} for team ${teamId} at position ${index + 1} (level ${levelId})`
+      );
+      return model;
+    } catch (error) {
+      console.error(
+        `ERROR: Failed to resolve model for team ${teamId} level ${levelId}, using fallback:`,
+        error
+      );
+      return bedrockConfig.fallbackModelId;
+    }
   }
 
   static async getNextLevel(
