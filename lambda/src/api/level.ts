@@ -375,7 +375,7 @@ export const handler = async (
       }
 
       // otherwise, more levels to go
-      // Use level_id (the real LEVEL id), not id (the join-row's own id).
+      // TeamLevel.id is the join row, not the level.
       const newCurrentUserMessages = await MessageOperations.getForUserAtLevel(
         headers["user-id"] as UUID,
         newCurrentLevel.level_id as UUID

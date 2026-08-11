@@ -86,12 +86,14 @@ export const fetchBaseData = async (
 
   // Skip once set: the conditional write would fail on every ping (10s) for no gain.
   if (!currentTeamLevel.completed_at && !currentTeamLevel.started_at) {
-    await TeamLevelOperations.markLevelAsStarted(
+    // Mirror only a winning write; on a lost race leave it unset so the next request reads the real value.
+    const startedAt = await TeamLevelOperations.markLevelAsStarted(
       headers["team-id"] as UUID,
       currentTeamLevel.level_id as UUID
     );
-    // Mirror the write so callers on this first request see it instead of a spurious warning.
-    currentTeamLevel.started_at = new Date().toISOString();
+    if (startedAt) {
+      currentTeamLevel.started_at = startedAt;
+    }
   }
 
   let currentUser = await UserOperations.getById(headers["user-id"] as UUID);

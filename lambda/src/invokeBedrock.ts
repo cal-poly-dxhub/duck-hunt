@@ -124,12 +124,7 @@ const invokeBedrock = async ({
 
     const response = await bedrockClient.send(command);
 
-    // Extract the response text — ONLY from genuine `text` blocks. Reasoning
-    // models return their chain-of-thought in separate `reasoningContent`
-    // blocks; we must NEVER surface that to players. If a model returns only
-    // reasoning (e.g. it was truncated before emitting the final answer), we
-    // treat it as a failed invocation → fallback, rather than leaking the
-    // internal monologue.
+    // Extract only response text and hide reasoning from players; fail if there is no response text.
     const contentBlocks = response.output?.message?.content ?? [];
     const text = contentBlocks
       .filter((block) => typeof block.text === "string")
@@ -142,9 +137,7 @@ const invokeBedrock = async ({
       );
     }
 
-    // Strip any inline <think>...</think> reasoning so players only see the
-    // final answer. If nothing remains (e.g. the answer was cut off while
-    // still reasoning), treat it as a failed invocation → fallback.
+    // Strip inline <think> reasoning; nothing left means it was cut off mid-thought, so fall back.
     const cleanedText = stripReasoning(text);
     if (!cleanedText) {
       throw new Error(

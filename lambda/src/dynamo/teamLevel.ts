@@ -139,11 +139,11 @@ export class TeamLevelOperations {
     );
   }
 
-  /** Record first arrival at a level. Conditional write: only the first call sets it. */
+  /** Record first arrival at a level. Returns the timestamp set, or null if another request set it first. */
   static async markLevelAsStarted(
     teamId: string,
     levelId: string
-  ): Promise<void> {
+  ): Promise<string | null> {
     const currentTimestamp = getCurrentTimestamp();
 
     try {
@@ -166,6 +166,7 @@ export class TeamLevelOperations {
       console.log(
         `INFO: Marked level ${levelId} as started for team ${teamId} at ${currentTimestamp}`
       );
+      return currentTimestamp;
     } catch (error: any) {
       // Already started — expected on every call after the first. Not an error.
       if (error?.name !== "ConditionalCheckFailedException") {
@@ -174,6 +175,7 @@ export class TeamLevelOperations {
           error
         );
       }
+      return null;
     }
   }
 
