@@ -197,7 +197,6 @@ export default function Chat() {
   const searchParams = useSearchParams();
   const teamIdFromUrl = searchParams.get("team-id");
   const levelIdFromUrl = searchParams.get("level-id");
-  const endSequenceFromUrl = searchParams.get("end-sequence");
 
   // check for teamId and userId
   useEffect(() => {
@@ -285,7 +284,7 @@ export default function Chat() {
       handleCheckLocation();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, teamId, levelIdFromUrl, endSequenceFromUrl, refreshCounter]);
+  }, [userId, teamId, levelIdFromUrl, refreshCounter]);
 
   // ping location interval — only runs after the player consents to location.
   useEffect(() => {
