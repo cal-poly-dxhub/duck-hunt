@@ -28,9 +28,7 @@ import { useEffect, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import { v4 } from "uuid";
 
-// Render markdown from the LLM (bold, italics, lists, links) while keeping the
-// retro-terminal look: monospace, green, and laid out inline so the prefix and
-// blinking cursor still sit on the same line as short replies.
+// Render LLM markdown inline so short replies stay on the prefix line.
 const markdownComponents: Components = {
   p: ({ children }) => <span>{children}</span>,
   ul: ({ children }) => (
@@ -78,11 +76,9 @@ export default function Chat() {
   const [needsTeamPhoto, setNeedsTeamPhoto] = useState<boolean>(false);
   const [uploadingPhoto, setUploadingPhoto] = useState<boolean>(false);
   const [photoSaved, setPhotoSaved] = useState<boolean>(false);
-  // Bumped after a successful photo upload to re-trigger the /level fetch, so
-  // the page advances on its own instead of the player having to refresh.
+  // Bumped after a photo upload to re-trigger the /level fetch.
   const [refreshCounter, setRefreshCounter] = useState<number>(0);
 
-  // Location consent: undefined = not yet decided (show modal), true/false = decided.
   const [locationConsent, setLocationConsent] = useState<boolean | undefined>(
     undefined
   );
@@ -254,8 +250,6 @@ export default function Chat() {
         endScreen,
       });
 
-      // Hunt complete: send the winner to the win screen, everyone else to the
-      // finish screen. Static pages live in frontend/public (served at root).
       if (endScreen === "win") {
         window.location.href = "/win.html";
         return;
@@ -425,8 +419,7 @@ export default function Chat() {
               try {
                 const result = await scavengerHuntApi.uploadTeamPhoto(file);
                 if (result.success) {
-                  // Confirm success, then re-fetch level so the page advances
-                  // automatically (no manual refresh needed).
+                  // Re-fetch level so the page advances automatically.
                   setPhotoSaved(true);
                   setTimeout(() => {
                     setNeedsTeamPhoto(false);
@@ -443,7 +436,6 @@ export default function Chat() {
                 setUploadingPhoto(false);
                 alert("Failed to upload team photo. Please try again.");
               } finally {
-                // allow re-selecting the same file if a retry is needed
                 e.target.value = "";
               }
             }}

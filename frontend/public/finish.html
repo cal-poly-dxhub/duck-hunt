@@ -19,7 +19,6 @@
     align-items: center;
     justify-content: center;
     position: relative;
-    /* Calm cool gradient — friendly, not "champion gold" */
     background: linear-gradient(135deg, #6fd0e6, #3fb6d3, #2e8fb8, #5bc6dd, #43b0d6);
     background-size: 400% 400%;
     animation: bgShift 14s ease infinite;
@@ -57,7 +56,6 @@
     100% { opacity: 1; transform: translateY(0); }
   }
 
-  /* ---------- Duck (no crown; a happy medal instead) ---------- */
   .duck-wrap {
     width: min(52vw, 240px);
     animation: bob 1.6s ease-in-out infinite;
@@ -87,7 +85,6 @@
     50%      { opacity: 1;    transform: scale(1.1); }
   }
 
-  /* ---------- Text ---------- */
   .headline {
     font-size: clamp(40px, 12vw, 90px);
     font-weight: 900;
@@ -254,7 +251,6 @@
     try { navigator.vibrate([40, 60, 40]); } catch (e) {}
   }
 
-  // ---------- Duck quack (loops, starts on first interaction) ----------
   // Sound source: pixabay.com (royalty-free).
   const clip = new Audio('win-sound.mp3');
   clip.loop = true;
@@ -280,7 +276,6 @@
     if (!document.hidden) startAudio();
   });
 
-  // ---------- Tap-to-celebrate overlay ----------
   // Tapping it counts as the user gesture that unblocks audio, then fades out.
   const prompt = document.getElementById('volume-prompt');
   if (prompt) {

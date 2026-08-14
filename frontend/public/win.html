@@ -31,7 +31,6 @@
     100% { background-position: 0% 50%; }
   }
 
-  /* Confetti sits above the gradient, behind the content */
   #confetti {
     position: fixed;
     inset: 0;
@@ -261,14 +260,12 @@
         vr: (Math.random() - 0.5) * 0.3,
         shape: Math.random() < 0.5 ? 'rect' : 'circ',
         wob: Math.random() * Math.PI * 2,
-        grav: 0,          // rain has its own constant fall; no extra gravity
+        grav: 0,
         drag: 1
       });
     }
   }
 
-  // BIG explosion: fling particles radially outward from the center, then let
-  // gravity pull them down (firework-style).
   function explode(n) {
     const cx = W / 2, cy = H / 2;
     for (let i = 0; i < n; i++) {
@@ -284,15 +281,13 @@
         vr: (Math.random() - 0.5) * 0.5,
         shape: Math.random() < 0.5 ? 'rect' : 'circ',
         wob: Math.random() * Math.PI * 2,
-        grav: 0.28 * dpr,   // pulled down after the blast
-        drag: 0.97          // air resistance so the blast slows
+        grav: 0.28 * dpr,
+        drag: 0.97
       });
     }
   }
 
-  // 💥 Kick off with a massive central explosion...
   explode(260);
-  // ...then start the steady rain shortly after, once the blast settles.
   setTimeout(() => {
     spawn(120);
     setInterval(() => { if (pieces.length < 340) spawn(30); }, 700);
@@ -304,7 +299,7 @@
       const p = pieces[i];
       p.wob += 0.05;
       p.vx *= p.drag;
-      p.vy = p.vy * p.drag + p.grav;   // gravity for blast particles
+      p.vy = p.vy * p.drag + p.grav;
       p.x += p.vx + Math.sin(p.wob) * 0.6 * dpr;
       p.y += p.vy;
       p.rot += p.vr;
@@ -320,7 +315,6 @@
         ctx.fill();
       }
       ctx.restore();
-      // Remove once well off any edge.
       if (p.y > H + 60 || p.x < -80 || p.x > W + 80) pieces.splice(i, 1);
     }
     requestAnimationFrame(draw);
@@ -333,8 +327,6 @@
   }
 
   // ---------- Duck quacks + celebratory chime (WebAudio, no files) ----------
-  // Autoplay audio is blocked until a user gesture on most phones, so we
-  // play it on the first tap/touch anywhere.
   let ac = null;
   function ctxGet() {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -344,9 +336,6 @@
     return ac;
   }
 
-  // Synthesize one quack: a buzzy sawtooth pushed through a sweeping
-  // bandpass "formant" filter, with a quick pitch rise-then-fall and a
-  // short amplitude burst. Sounds convincingly duck-like.
   function quack(startAt, pitch) {
     pitch = pitch || 1;
     const osc = ac.createOscillator();
@@ -358,15 +347,12 @@
 
     const t = startAt;
     const dur = 0.19;
-    // Pitch: quick rise then fall — the classic quack contour.
     osc.frequency.setValueAtTime(280 * pitch, t);
     osc.frequency.linearRampToValueAtTime(720 * pitch, t + 0.05);
     osc.frequency.linearRampToValueAtTime(360 * pitch, t + dur);
-    // Formant sweep on the bandpass gives it the nasal "quack" timbre.
     bp.frequency.setValueAtTime(900 * pitch, t);
     bp.frequency.linearRampToValueAtTime(1700 * pitch, t + 0.05);
     bp.frequency.linearRampToValueAtTime(800 * pitch, t + dur);
-    // Amplitude: sharp attack, quick decay.
     gain.gain.setValueAtTime(0.0001, t);
     gain.gain.exponentialRampToValueAtTime(0.5, t + 0.015);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -375,15 +361,11 @@
     osc.start(t); osc.stop(t + dur + 0.02);
   }
 
-  // A longer, sillier duck routine (~5s): a giggly stutter of quacks that
-  // speeds up, a dramatic pause, one HUGE low "victory honk" quack, then a
-  // sparkly fanfare. Meant to be goofy.
   function synthRoutine() {
     if (!ctxGet()) return;
     const now = ac.currentTime;
     let t = now;
 
-    // 1) Chattering quacks that accelerate and rise in pitch (the "giggle").
     let gap = 0.26;
     let pitch = 0.9;
     for (let i = 0; i < 8; i++) {
@@ -393,10 +375,8 @@
       pitch *= 1.05;    // creeps higher — sounds increasingly excited
     }
 
-    // 2) Comedic pause.
     t += 0.45;
 
-    // 3) One big, low, dramatic "victory honk" quack (slower + deeper).
     (function honk(startAt) {
       const osc = ac.createOscillator();
       const bp = ac.createBiquadFilter();
@@ -418,7 +398,6 @@
     })(t);
     t += 0.9;
 
-    // 4) Sparkly triumphant fanfare chime to finish.
     const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5]; // C E G C E
     notes.forEach((f, i) => {
       const o = ac.createOscillator();
@@ -434,10 +413,6 @@
     });
   }
 
-  // ---------- Duck quack audio: loop, start ASAP on page open ----------
-  // Uses the real clip at public/win-sound.mp3 (loops forever). Most mobile
-  // browsers block audio autoplay until a user gesture, so we try to play
-  // immediately and, if blocked, kick it off on the very first tap/touch.
   // Sound source: pixabay.com (royalty-free).
   const clip = new Audio('win-sound.mp3');
   clip.loop = true;
@@ -457,19 +432,14 @@
     }
   }
 
-  // Attempt immediate autoplay on load.
   startAudio();
-  // Fallbacks: first interaction of any kind starts (and loops) the quacks.
   ['touchstart', 'click', 'pointerdown', 'keydown'].forEach(function (ev) {
     addEventListener(ev, startAudio, { once: false });
   });
-  // If the tab was backgrounded during load, try again when it becomes visible.
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden) startAudio();
   });
 
-  // ---------- Tap-to-celebrate overlay ----------
-  // Tapping it counts as the user gesture that unblocks audio, then fades out.
   const prompt = document.getElementById('volume-prompt');
   if (prompt) {
     function dismissPrompt() {
