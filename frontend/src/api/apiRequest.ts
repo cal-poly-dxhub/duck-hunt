@@ -133,7 +133,7 @@ export async function apiRequest<T = unknown>(
       error: {
         error: errorMessage,
         displayMessage:
-          "An unexpected error occurred. Please check your internet connection and refresh the page.",
+          "An unexpected error occurred. Please check your internet connection and refresh the page. If it keeps happening, try disconnecting from WiFi and using cellular data instead.",
         details: "Error caught in apiRequest top level catch",
       },
     };
